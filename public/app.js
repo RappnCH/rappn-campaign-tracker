@@ -13,6 +13,7 @@ let newCampaignData = {};
 let charts = {};
 let campaignFilter = 'active'; // 'active', 'inactive', or 'all'
 let reactivatingCampaign = null; // For the reactivation modal
+let clicksTimeframe = 'daily'; // 'daily', 'weekly', or 'monthly'
 
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', async function() {
@@ -801,7 +802,20 @@ function renderPerformance() {
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                         <!-- Clicks Over Time -->
                         <div class="bg-white rounded-2xl shadow-md p-6">
-                            <h3 class="text-xl font-bold mb-4">Clicks Over Time (Last 30 Days)</h3>
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-xl font-bold">Clicks Over Time</h3>
+                                <div class="flex gap-2">
+                                    <button onclick="setClicksTimeframe('daily')" class="px-3 py-1 text-sm rounded ${clicksTimeframe === 'daily' ? 'bg-rappn-green text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
+                                        Daily
+                                    </button>
+                                    <button onclick="setClicksTimeframe('weekly')" class="px-3 py-1 text-sm rounded ${clicksTimeframe === 'weekly' ? 'bg-rappn-green text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
+                                        Weekly
+                                    </button>
+                                    <button onclick="setClicksTimeframe('monthly')" class="px-3 py-1 text-sm rounded ${clicksTimeframe === 'monthly' ? 'bg-rappn-green text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
+                                        Monthly
+                                    </button>
+                                </div>
+                            </div>
                             <div style="height: 300px; position: relative;">
                                 <canvas id="clicksOverTimeChart"></canvas>
                             </div>
@@ -1078,7 +1092,7 @@ function generateQRCodes() {
 // Load overview analytics
 async function loadOverviewAnalytics() {
     try {
-        const response = await fetch(`${API_BASE}/analytics/overview`);
+        const response = await fetch(`${API_BASE}/analytics/overview?status=${campaignFilter}&timeframe=${clicksTimeframe}`);
         if (!response.ok) throw new Error('Failed to load overview analytics');
         overviewAnalytics = await response.json();
         console.log('Overview analytics loaded:', overviewAnalytics);
@@ -1088,10 +1102,24 @@ async function loadOverviewAnalytics() {
     }
 }
 
+// Set clicks timeframe and reload data
+window.setClicksTimeframe = async function(timeframe) {
+    clicksTimeframe = timeframe;
+    renderApp();
+    // Reload analytics with new timeframe
+    if (!selectedCampaign) {
+        await loadOverviewAnalytics();
+        renderApp();
+    } else {
+        await loadCampaignAnalytics(selectedCampaign.campaign_id);
+        renderApp();
+    }
+};
+
 // Load campaign-specific analytics
 async function loadCampaignAnalytics(campaign_id) {
     try {
-        const response = await fetch(`${API_BASE}/analytics/campaign/${campaign_id}`);
+        const response = await fetch(`${API_BASE}/analytics/campaign/${campaign_id}?timeframe=${clicksTimeframe}`);
         if (!response.ok) throw new Error('Failed to load campaign analytics');
         campaignAnalytics = await response.json();
         console.log('Campaign analytics loaded:', campaignAnalytics);

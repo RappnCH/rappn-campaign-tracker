@@ -45,6 +45,9 @@ router.get('/overview', async (req: Request, res: Response) => {
       return res.status(503).json({ error: 'Google Sheets not available' });
     }
 
+    const status = (req.query.status as string) || 'active';
+    const timeframe = (req.query.timeframe as string) || 'daily';
+
     // Fetch all clicks
     const clicksResponse = await api.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
@@ -61,8 +64,17 @@ router.get('/overview', async (req: Request, res: Response) => {
 
     const campaigns = campaignsResponse.data.values || [];
     
-    // Filter to only active campaigns (exclude inactive/deleted)
-    const activeCampaignsData = campaigns.filter((c: any) => c[3] !== 'inactive');
+    // Filter campaigns based on status parameter
+    let activeCampaignsData: any[];
+    if (status === 'active') {
+      activeCampaignsData = campaigns.filter((c: any) => c[3] === 'active');
+    } else if (status === 'inactive') {
+      activeCampaignsData = campaigns.filter((c: any) => c[3] === 'inactive');
+    } else {
+      // 'all' - include both active and inactive
+      activeCampaignsData = campaigns.filter((c: any) => c[3] === 'active' || c[3] === 'inactive');
+    }
+    
     const activeCampaignIds = new Set(activeCampaignsData.map((c: any) => c[0]));
     
     // Filter clicks to only those from active campaigns
@@ -76,15 +88,35 @@ router.get('/overview', async (req: Request, res: Response) => {
     // Get unique channels from active clicks
     const channels = [...new Set(activeClicks.map((c: any) => c[4]))];
 
-    // Calculate clicks by date (last 30 days)
+    // Calculate clicks by date based on timeframe
     const clicksByDate: { [key: string]: number } = {};
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
+    // Helper function to get week number
+    const getWeekNumber = (date: Date): string => {
+      const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+      const pastDaysOfYear = (date.getTime() - firstDayOfYear.getTime()) / 86400000;
+      return `${date.getFullYear()}-W${String(Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7)).padStart(2, '0')}`;
+    };
+
+    // Helper function to get month key
+    const getMonthKey = (date: Date): string => {
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    };
+
     activeClicks.forEach((click: any) => {
       const timestamp = new Date(click[1]);
       if (timestamp >= thirtyDaysAgo) {
-        const dateKey = timestamp.toISOString().split('T')[0];
+        let dateKey: string;
+        if (timeframe === 'weekly') {
+          dateKey = getWeekNumber(timestamp);
+        } else if (timeframe === 'monthly') {
+          dateKey = getMonthKey(timestamp);
+        } else {
+          // daily
+          dateKey = timestamp.toISOString().split('T')[0];
+        }
         clicksByDate[dateKey] = (clicksByDate[dateKey] || 0) + 1;
       }
     });
@@ -172,6 +204,8 @@ router.get('/overview', async (req: Request, res: Response) => {
 router.get('/campaign/:campaign_id', async (req: Request, res: Response) => {
   try {
     const { campaign_id } = req.params;
+    const timeframe = (req.query.timeframe as string) || 'daily';
+    
     const api = await initializeSheets();
     if (!api) {
       return res.status(503).json({ error: 'Google Sheets not available' });
@@ -204,11 +238,31 @@ router.get('/campaign/:campaign_id', async (req: Request, res: Response) => {
     const allPlacements = placementsResponse.data.values || [];
     const placements = allPlacements.filter((p: any) => p[1] === campaign_id);
 
-    // Calculate clicks by date
+    // Helper function to get week number
+    const getWeekNumber = (date: Date): string => {
+      const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+      const pastDaysOfYear = (date.getTime() - firstDayOfYear.getTime()) / 86400000;
+      return `${date.getFullYear()}-W${String(Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7)).padStart(2, '0')}`;
+    };
+
+    // Helper function to get month key
+    const getMonthKey = (date: Date): string => {
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    };
+
+    // Calculate clicks by date with timeframe support
     const clicksByDate: { [key: string]: number } = {};
     clicks.forEach((click: any) => {
       const timestamp = new Date(click[1]);
-      const dateKey = timestamp.toISOString().split('T')[0];
+      let dateKey: string;
+      if (timeframe === 'weekly') {
+        dateKey = getWeekNumber(timestamp);
+      } else if (timeframe === 'monthly') {
+        dateKey = getMonthKey(timestamp);
+      } else {
+        // daily
+        dateKey = timestamp.toISOString().split('T')[0];
+      }
       clicksByDate[dateKey] = (clicksByDate[dateKey] || 0) + 1;
     });
 
