@@ -629,13 +629,17 @@ function renderPerformance() {
                         <!-- Clicks Over Time -->
                         <div class="bg-white rounded-2xl shadow-md p-6">
                             <h3 class="text-xl font-bold mb-4">Clicks Over Time (Last 30 Days)</h3>
-                            <canvas id="clicksOverTimeChart" height="250"></canvas>
+                            <div style="height: 300px; position: relative;">
+                                <canvas id="clicksOverTimeChart"></canvas>
+                            </div>
                         </div>
 
                         <!-- Clicks by Channel -->
                         <div class="bg-white rounded-2xl shadow-md p-6">
                             <h3 class="text-xl font-bold mb-4">Clicks by Channel</h3>
-                            <canvas id="clicksByChannelChart" height="250"></canvas>
+                            <div style="height: 300px; position: relative;">
+                                <canvas id="clicksByChannelChart"></canvas>
+                            </div>
                         </div>
                     </div>
 
@@ -644,13 +648,15 @@ function renderPerformance() {
                         <!-- Clicks by Hour -->
                         <div class="bg-white rounded-2xl shadow-md p-6">
                             <h3 class="text-xl font-bold mb-4">Clicks by Hour (Today)</h3>
-                            <canvas id="clicksByHourChart" height="250"></canvas>
+                            <div style="height: 300px; position: relative;">
+                                <canvas id="clicksByHourChart"></canvas>
+                            </div>
                         </div>
 
                         <!-- Top Campaigns -->
                         <div class="bg-white rounded-2xl shadow-md p-6">
                             <h3 class="text-xl font-bold mb-4">Top Campaigns by Clicks</h3>
-                            <div class="space-y-3 max-h-80 overflow-y-auto">
+                            <div class="space-y-3" style="height: 300px; overflow-y: auto;">
                                 ${overviewAnalytics.clicks_by_campaign.slice(0, 10).map((c, i) => `
                                     <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer" onclick="viewCampaignAnalytics('${c.campaign_id}')">
                                         <div class="flex items-center space-x-3">
@@ -720,13 +726,17 @@ function renderPerformance() {
                     <!-- Clicks Over Time -->
                     <div class="bg-white rounded-2xl shadow-md p-6">
                         <h3 class="text-xl font-bold mb-4">Clicks Over Time</h3>
-                        <canvas id="campaignClicksOverTimeChart" height="250"></canvas>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="campaignClicksOverTimeChart"></canvas>
+                        </div>
                     </div>
 
                     <!-- Clicks by Channel -->
                     <div class="bg-white rounded-2xl shadow-md p-6">
                         <h3 class="text-xl font-bold mb-4">Clicks by Channel</h3>
-                        <canvas id="campaignClicksByChannelChart" height="250"></canvas>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="campaignClicksByChannelChart"></canvas>
+                        </div>
                     </div>
                 </div>
 
@@ -735,13 +745,17 @@ function renderPerformance() {
                     <!-- Clicks by Hour -->
                     <div class="bg-white rounded-2xl shadow-md p-6">
                         <h3 class="text-xl font-bold mb-4">Clicks by Hour</h3>
-                        <canvas id="campaignClicksByHourChart" height="250"></canvas>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="campaignClicksByHourChart"></canvas>
+                        </div>
                     </div>
 
                     <!-- Clicks by Day of Week -->
                     <div class="bg-white rounded-2xl shadow-md p-6">
                         <h3 class="text-xl font-bold mb-4">Clicks by Day of Week</h3>
-                        <canvas id="campaignClicksByDayChart" height="250"></canvas>
+                        <div style="height: 300px; position: relative;">
+                            <canvas id="campaignClicksByDayChart"></canvas>
+                        </div>
                     </div>
                 </div>
 
@@ -962,18 +976,46 @@ function renderOverviewCharts() {
                     data: clicks,
                     borderColor: '#3aaa35',
                     backgroundColor: 'rgba(58, 170, 53, 0.1)',
+                    borderWidth: 2,
                     tension: 0.4,
-                    fill: true
+                    fill: true,
+                    pointRadius: 3,
+                    pointHoverRadius: 5
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { display: false }
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        titleFont: { size: 14, weight: 'bold' },
+                        bodyFont: { size: 13 }
+                    }
                 },
                 scales: {
-                    y: { beginAtZero: true }
+                    y: { 
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0,
+                            font: { size: 11 }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            font: { size: 11 },
+                            maxRotation: 45,
+                            minRotation: 45
+                        },
+                        grid: {
+                            display: false
+                        }
+                    }
                 }
             }
         });
@@ -981,63 +1023,112 @@ function renderOverviewCharts() {
 
     // Clicks by channel
     const clicksByChannelCanvas = document.getElementById('clicksByChannelChart');
-    if (clicksByChannelCanvas && overviewAnalytics.clicks_by_channel.length > 0) {
-        const channels = overviewAnalytics.clicks_by_channel.map(c => c.channel);
-        const clicks = overviewAnalytics.clicks_by_channel.map(c => c.clicks);
-        
-        charts.clicksByChannel = new Chart(clicksByChannelCanvas, {
-            type: 'doughnut',
-            data: {
-                labels: channels,
-                datasets: [{
-                    data: clicks,
-                    backgroundColor: [
-                        '#3aaa35',
-                        '#18a19a',
-                        '#fbbf24',
-                        '#f59e0b',
-                        '#ef4444',
-                        '#8b5cf6'
-                    ]
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'bottom' }
+    if (clicksByChannelCanvas) {
+        if (overviewAnalytics.clicks_by_channel.length > 0) {
+            const channels = overviewAnalytics.clicks_by_channel.map(c => c.channel);
+            const clicks = overviewAnalytics.clicks_by_channel.map(c => c.clicks);
+            
+            charts.clicksByChannel = new Chart(clicksByChannelCanvas, {
+                type: 'doughnut',
+                data: {
+                    labels: channels,
+                    datasets: [{
+                        data: clicks,
+                        backgroundColor: [
+                            '#3aaa35',
+                            '#18a19a',
+                            '#fbbf24',
+                            '#f59e0b',
+                            '#ef4444',
+                            '#8b5cf6'
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { 
+                            position: 'bottom',
+                            labels: {
+                                padding: 15,
+                                font: { size: 12 },
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            titleFont: { size: 14, weight: 'bold' },
+                            bodyFont: { size: 13 },
+                            callbacks: {
+                                label: function(context) {
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                    return `${context.label}: ${context.parsed} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
                 }
-            }
-        });
+            });
+        }
     }
 
     // Clicks by hour
     const clicksByHourCanvas = document.getElementById('clicksByHourChart');
-    if (clicksByHourCanvas && overviewAnalytics.clicks_by_hour.length > 0) {
-        const hours = overviewAnalytics.clicks_by_hour.map(h => `${h.hour}:00`);
-        const clicks = overviewAnalytics.clicks_by_hour.map(h => h.clicks);
-        
-        charts.clicksByHour = new Chart(clicksByHourCanvas, {
-            type: 'bar',
-            data: {
-                labels: hours,
-                datasets: [{
-                    label: 'Clicks',
-                    data: clicks,
-                    backgroundColor: '#18a19a'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false }
+    if (clicksByHourCanvas) {
+        if (overviewAnalytics.clicks_by_hour.length > 0) {
+            const hours = overviewAnalytics.clicks_by_hour.map(h => `${h.hour}:00`);
+            const clicks = overviewAnalytics.clicks_by_hour.map(h => h.clicks);
+            
+            charts.clicksByHour = new Chart(clicksByHourCanvas, {
+                type: 'bar',
+                data: {
+                    labels: hours,
+                    datasets: [{
+                        label: 'Clicks',
+                        data: clicks,
+                        backgroundColor: '#18a19a',
+                        borderRadius: 6,
+                        borderSkipped: false
+                    }]
                 },
-                scales: {
-                    y: { beginAtZero: true }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12
+                        }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0,
+                                font: { size: 11 }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                font: { size: 11 }
+                            },
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
                 }
-            }
-        });
+            });
+        }
     }
 }
 
@@ -1058,18 +1149,46 @@ function renderCampaignCharts() {
                     data: clicks,
                     borderColor: '#3aaa35',
                     backgroundColor: 'rgba(58, 170, 53, 0.1)',
+                    borderWidth: 2,
                     tension: 0.4,
-                    fill: true
+                    fill: true,
+                    pointRadius: 3,
+                    pointHoverRadius: 5
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { display: false }
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        titleFont: { size: 14, weight: 'bold' },
+                        bodyFont: { size: 13 }
+                    }
                 },
                 scales: {
-                    y: { beginAtZero: true }
+                    y: { 
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0,
+                            font: { size: 11 }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            font: { size: 11 },
+                            maxRotation: 45,
+                            minRotation: 45
+                        },
+                        grid: {
+                            display: false
+                        }
+                    }
                 }
             }
         });
@@ -1077,92 +1196,166 @@ function renderCampaignCharts() {
 
     // Clicks by channel
     const clicksByChannelCanvas = document.getElementById('campaignClicksByChannelChart');
-    if (clicksByChannelCanvas && campaignAnalytics.clicks_by_channel.length > 0) {
-        const channels = campaignAnalytics.clicks_by_channel.map(c => c.channel);
-        const clicks = campaignAnalytics.clicks_by_channel.map(c => c.clicks);
-        
-        charts.campaignClicksByChannel = new Chart(clicksByChannelCanvas, {
-            type: 'doughnut',
-            data: {
-                labels: channels,
-                datasets: [{
-                    data: clicks,
-                    backgroundColor: [
-                        '#3aaa35',
-                        '#18a19a',
-                        '#fbbf24',
-                        '#f59e0b',
-                        '#ef4444',
-                        '#8b5cf6'
-                    ]
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'bottom' }
+    if (clicksByChannelCanvas) {
+        if (campaignAnalytics.clicks_by_channel.length > 0) {
+            const channels = campaignAnalytics.clicks_by_channel.map(c => c.channel);
+            const clicks = campaignAnalytics.clicks_by_channel.map(c => c.clicks);
+            
+            charts.campaignClicksByChannel = new Chart(clicksByChannelCanvas, {
+                type: 'doughnut',
+                data: {
+                    labels: channels,
+                    datasets: [{
+                        data: clicks,
+                        backgroundColor: [
+                            '#3aaa35',
+                            '#18a19a',
+                            '#fbbf24',
+                            '#f59e0b',
+                            '#ef4444',
+                            '#8b5cf6'
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { 
+                            position: 'bottom',
+                            labels: {
+                                padding: 15,
+                                font: { size: 12 },
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            titleFont: { size: 14, weight: 'bold' },
+                            bodyFont: { size: 13 },
+                            callbacks: {
+                                label: function(context) {
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                    return `${context.label}: ${context.parsed} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
                 }
-            }
-        });
+            });
+        }
     }
 
     // Clicks by hour
     const clicksByHourCanvas = document.getElementById('campaignClicksByHourChart');
-    if (clicksByHourCanvas && campaignAnalytics.clicks_by_hour.length > 0) {
-        const hours = campaignAnalytics.clicks_by_hour.map(h => `${h.hour}:00`);
-        const clicks = campaignAnalytics.clicks_by_hour.map(h => h.clicks);
-        
-        charts.campaignClicksByHour = new Chart(clicksByHourCanvas, {
-            type: 'bar',
-            data: {
-                labels: hours,
-                datasets: [{
-                    label: 'Clicks',
-                    data: clicks,
-                    backgroundColor: '#18a19a'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false }
+    if (clicksByHourCanvas) {
+        if (campaignAnalytics.clicks_by_hour.length > 0) {
+            const hours = campaignAnalytics.clicks_by_hour.map(h => `${h.hour}:00`);
+            const clicks = campaignAnalytics.clicks_by_hour.map(h => h.clicks);
+            
+            charts.campaignClicksByHour = new Chart(clicksByHourCanvas, {
+                type: 'bar',
+                data: {
+                    labels: hours,
+                    datasets: [{
+                        label: 'Clicks',
+                        data: clicks,
+                        backgroundColor: '#18a19a',
+                        borderRadius: 6,
+                        borderSkipped: false
+                    }]
                 },
-                scales: {
-                    y: { beginAtZero: true }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12
+                        }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0,
+                                font: { size: 11 }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                font: { size: 11 }
+                            },
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
                 }
-            }
-        });
+            });
+        }
     }
 
     // Clicks by day of week
     const clicksByDayCanvas = document.getElementById('campaignClicksByDayChart');
-    if (clicksByDayCanvas && campaignAnalytics.clicks_by_day_of_week.length > 0) {
-        const days = campaignAnalytics.clicks_by_day_of_week.map(d => d.day_of_week);
-        const clicks = campaignAnalytics.clicks_by_day_of_week.map(d => d.clicks);
-        
-        charts.campaignClicksByDay = new Chart(clicksByDayCanvas, {
-            type: 'bar',
-            data: {
-                labels: days,
-                datasets: [{
-                    label: 'Clicks',
-                    data: clicks,
-                    backgroundColor: '#3aaa35'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false }
+    if (clicksByDayCanvas) {
+        if (campaignAnalytics.clicks_by_day_of_week.length > 0) {
+            const days = campaignAnalytics.clicks_by_day_of_week.map(d => d.day_of_week);
+            const clicks = campaignAnalytics.clicks_by_day_of_week.map(d => d.clicks);
+            
+            charts.campaignClicksByDay = new Chart(clicksByDayCanvas, {
+                type: 'bar',
+                data: {
+                    labels: days,
+                    datasets: [{
+                        label: 'Clicks',
+                        data: clicks,
+                        backgroundColor: '#3aaa35',
+                        borderRadius: 6,
+                        borderSkipped: false
+                    }]
                 },
-                scales: {
-                    y: { beginAtZero: true }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12
+                        }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0,
+                                font: { size: 11 }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                font: { size: 11 }
+                            },
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
                 }
-            }
-        });
+            });
+        }
     }
 }
 
