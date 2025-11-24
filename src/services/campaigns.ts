@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { memoryDb } from '../db/memory';
 import { Campaign } from '../types';
-import { saveCampaignToSheets } from './googleSheets';
+import { saveCampaignToSheets, updateCampaignStatusInSheets } from './googleSheets';
 
 const router = Router();
 
@@ -136,12 +136,14 @@ router.put('/:id', async (req: Request, res: Response) => {
 
 /**
  * DELETE /campaigns/:id
- * Delete a campaign
+ * Delete a campaign (soft delete - sets status to inactive)
  */
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const result = await memoryDb.deleteCampaign(id);
+    
+    // Instead of deleting, set status to inactive
+    const result = await memoryDb.updateCampaign(id, { status: 'inactive' });
 
     if (!result) {
       return res.status(404).json({
@@ -149,14 +151,56 @@ router.delete('/:id', async (req: Request, res: Response) => {
       });
     }
 
+    // Update in Google Sheets
+    updateCampaignStatusInSheets(id, 'inactive').catch(err => 
+      console.error('Failed to update campaign status in Google Sheets:', err)
+    );
+
     res.json({
-      message: 'Campaign deleted successfully',
+      message: 'Campaign set to inactive successfully',
       campaign: result,
     });
   } catch (error) {
     console.error('Error deleting campaign:', error);
     res.status(500).json({
       error: 'Failed to delete campaign',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
+ * PATCH /campaigns/:id/status
+ * Toggle campaign status between active and inactive
+ */
+router.patch('/:id/status', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const campaign = await memoryDb.getCampaignById(id);
+
+    if (!campaign) {
+      return res.status(404).json({
+        error: 'Campaign not found',
+      });
+    }
+
+    // Toggle status
+    const newStatus = campaign.status === 'active' ? 'inactive' : 'active';
+    const result = await memoryDb.updateCampaign(id, { status: newStatus });
+
+    // Update in Google Sheets
+    updateCampaignStatusInSheets(id, newStatus).catch(err => 
+      console.error('Failed to update campaign status in Google Sheets:', err)
+    );
+
+    res.json({
+      message: `Campaign status updated to ${newStatus}`,
+      campaign: result,
+    });
+  } catch (error) {
+    console.error('Error toggling campaign status:', error);
+    res.status(500).json({
+      error: 'Failed to toggle campaign status',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }

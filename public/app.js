@@ -11,6 +11,7 @@ let overviewAnalytics = null;
 let wizardStep = 1;
 let newCampaignData = {};
 let charts = {};
+let campaignFilter = 'active'; // 'active', 'inactive', or 'all'
 
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', async function() {
@@ -115,6 +116,9 @@ function renderCurrentView() {
 }
 
 function renderDashboard() {
+    // Filter out inactive (deleted) campaigns from dashboard
+    const activeCampaigns = campaigns.filter(c => c.status !== 'inactive');
+    
     return `
         <div class="p-6">
             <h2 class="text-3xl font-bold text-gray-900 mb-6">Campaign Dashboard</h2>
@@ -123,19 +127,19 @@ function renderDashboard() {
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
                 <div class="bg-white rounded-2xl shadow-md p-6">
                     <div class="text-gray-500 text-sm mb-2">Total Campaigns</div>
-                    <div class="text-3xl font-bold text-gray-900">${campaigns.length}</div>
+                    <div class="text-3xl font-bold text-gray-900">${activeCampaigns.length}</div>
                 </div>
                 <div class="bg-white rounded-2xl shadow-md p-6">
                     <div class="text-gray-500 text-sm mb-2">Active</div>
-                    <div class="text-3xl font-bold text-green-600">${campaigns.filter(c => c.status === 'active').length}</div>
+                    <div class="text-3xl font-bold text-green-600">${activeCampaigns.filter(c => c.status === 'active').length}</div>
                 </div>
                 <div class="bg-white rounded-2xl shadow-md p-6">
                     <div class="text-gray-500 text-sm mb-2">Draft</div>
-                    <div class="text-3xl font-bold text-blue-600">${campaigns.filter(c => c.status === 'draft').length}</div>
+                    <div class="text-3xl font-bold text-blue-600">${activeCampaigns.filter(c => c.status === 'draft').length}</div>
                 </div>
                 <div class="bg-white rounded-2xl shadow-md p-6">
                     <div class="text-gray-500 text-sm mb-2">This Month</div>
-                    <div class="text-3xl font-bold text-purple-600">${campaigns.length}</div>
+                    <div class="text-3xl font-bold text-purple-600">${activeCampaigns.length}</div>
                 </div>
             </div>
 
@@ -157,7 +161,7 @@ function renderDashboard() {
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200">
-                            ${campaigns.map(campaign => `
+                            ${activeCampaigns.map(campaign => `
                                 <tr class="hover:bg-gray-50">
                                     <td class="px-6 py-4">
                                         <div class="font-medium text-gray-900">${campaign.name}</div>
@@ -593,9 +597,26 @@ function renderWizardStep() {
 function renderPerformance() {
     // Show overall analytics if no campaign is selected
     if (!selectedCampaign) {
+        // Filter campaigns based on status
+        const filteredCampaigns = campaigns.filter(c => {
+            if (campaignFilter === 'active') return c.status === 'active';
+            if (campaignFilter === 'inactive') return c.status === 'inactive';
+            return true; // 'all'
+        });
+
         return `
             <div class="p-6">
-                <h2 class="text-3xl font-bold text-gray-900 mb-6">Performance Overview</h2>
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-3xl font-bold text-gray-900">Performance Overview</h2>
+                    <div class="flex gap-3">
+                        <!-- Status Filter -->
+                        <select onchange="campaignFilter = this.value; switchView('performance')" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rappn-green">
+                            <option value="active" ${campaignFilter === 'active' ? 'selected' : ''}>Active Only</option>
+                            <option value="inactive" ${campaignFilter === 'inactive' ? 'selected' : ''}>Inactive Only</option>
+                            <option value="all" ${campaignFilter === 'all' ? 'selected' : ''}>All Campaigns</option>
+                        </select>
+                    </div>
+                </div>
                 
                 <!-- Loading state -->
                 ${!overviewAnalytics ? `
@@ -622,6 +643,19 @@ function renderPerformance() {
                             <div class="text-sm opacity-90 mb-2">Channels</div>
                             <div class="text-4xl font-bold">${overviewAnalytics.summary.channels}</div>
                         </div>
+                    </div>
+
+                    <!-- Campaign Selector Dropdown -->
+                    <div class="bg-white rounded-2xl shadow-md p-6 mb-6">
+                        <h3 class="text-xl font-bold mb-4">Select Campaign to Analyze</h3>
+                        <select onchange="if(this.value) viewCampaignAnalytics(this.value)" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rappn-green text-lg">
+                            <option value="">-- Select a Campaign --</option>
+                            ${filteredCampaigns.map(c => `
+                                <option value="${c.campaign_id}">
+                                    ${c.name} (${c.campaign_id}) - ${c.status.toUpperCase()}
+                                </option>
+                            `).join('')}
+                        </select>
                     </div>
 
                     <!-- Charts Row 1 -->
@@ -688,11 +722,19 @@ function renderPerformance() {
                         ← Back to Overview
                     </button>
                     <h2 class="text-3xl font-bold text-gray-900">${selectedCampaign.name}</h2>
-                    <p class="text-gray-600 mt-1">${selectedCampaign.campaign_id}</p>
+                    <p class="text-gray-600 mt-1">${selectedCampaign.campaign_id} - <span class="font-semibold ${selectedCampaign.status === 'active' ? 'text-green-600' : 'text-gray-500'}">${selectedCampaign.status.toUpperCase()}</span></p>
                 </div>
-                <button onclick="switchView('campaign-detail')" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
-                    Edit Campaign
-                </button>
+                <div class="flex gap-3">
+                    <button onclick="toggleCampaignStatus('${selectedCampaign.campaign_id}')" class="px-4 py-2 ${selectedCampaign.status === 'active' ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'} text-white rounded-lg transition">
+                        ${selectedCampaign.status === 'active' ? 'Set Inactive' : 'Set Active'}
+                    </button>
+                    <button onclick="deleteCampaign('${selectedCampaign.campaign_id}')" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">
+                        Delete Campaign
+                    </button>
+                    <button onclick="switchView('campaign-detail')" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+                        Edit Details
+                    </button>
+                </div>
             </div>
 
             ${!campaignAnalytics ? `
@@ -1526,6 +1568,71 @@ window.createCampaign = async function() {
 // Performance tracking (updated to use new analytics endpoints)
 window.viewPerformance = async function(campaignId) {
     await viewCampaignAnalytics(campaignId);
+};
+
+// Toggle campaign status between active and inactive
+window.toggleCampaignStatus = async function(campaignId) {
+    const campaign = campaigns.find(c => c.campaign_id === campaignId);
+    if (!campaign) return;
+    
+    const newStatus = campaign.status === 'active' ? 'inactive' : 'active';
+    const confirmMsg = `Are you sure you want to set this campaign to ${newStatus.toUpperCase()}?`;
+    
+    if (!confirm(confirmMsg)) return;
+    
+    try {
+        const response = await fetch(`${API_BASE}/campaigns/${campaignId}/status`, {
+            method: 'PATCH'
+        });
+        
+        if (response.ok) {
+            alert(`Campaign status updated to ${newStatus.toUpperCase()}`);
+            // Reload campaigns and refresh view
+            await loadCampaigns();
+            if (currentView === 'performance' && selectedCampaign && selectedCampaign.campaign_id === campaignId) {
+                selectedCampaign = campaigns.find(c => c.campaign_id === campaignId);
+                campaignAnalytics = null;
+                renderApp();
+                await loadCampaignAnalytics(campaignId);
+                renderApp();
+            } else {
+                renderApp();
+            }
+        } else {
+            alert('Failed to update campaign status');
+        }
+    } catch (error) {
+        console.error('Error toggling campaign status:', error);
+        alert('Failed to update campaign status');
+    }
+};
+
+// Delete campaign (soft delete - sets to inactive)
+window.deleteCampaign = async function(campaignId) {
+    const campaign = campaigns.find(c => c.campaign_id === campaignId);
+    if (!campaign) return;
+    
+    const confirmMsg = `Are you sure you want to DELETE "${campaign.name}"?\n\nThis will:\n- Set the campaign to INACTIVE\n- Keep all data in Google Sheets\n- Remove it from the campaign list\n\nThis action cannot be undone.`;
+    
+    if (!confirm(confirmMsg)) return;
+    
+    try {
+        const response = await fetch(`${API_BASE}/campaigns/${campaignId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            alert('Campaign deleted successfully');
+            // Reload campaigns and go to dashboard
+            await loadCampaigns();
+            switchView('dashboard');
+        } else {
+            alert('Failed to delete campaign');
+        }
+    } catch (error) {
+        console.error('Error deleting campaign:', error);
+        alert('Failed to delete campaign');
+    }
 };
 
 window.testClick = async function(placementId, url, campaignId) {

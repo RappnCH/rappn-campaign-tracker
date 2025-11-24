@@ -60,21 +60,28 @@ router.get('/overview', async (req: Request, res: Response) => {
     });
 
     const campaigns = campaignsResponse.data.values || [];
+    
+    // Filter to only active campaigns (exclude inactive/deleted)
+    const activeCampaignsData = campaigns.filter((c: any) => c[3] !== 'inactive');
+    const activeCampaignIds = new Set(activeCampaignsData.map((c: any) => c[0]));
+    
+    // Filter clicks to only those from active campaigns
+    const activeClicks = clicks.filter((click: any) => activeCampaignIds.has(click[2]));
 
     // Calculate totals
-    const totalClicks = clicks.length;
-    const totalCampaigns = campaigns.length;
-    const activeCampaigns = campaigns.filter((c: any) => c[3] === 'active').length;
+    const totalClicks = activeClicks.length;
+    const totalCampaigns = activeCampaignsData.length;
+    const activeCampaigns = activeCampaignsData.filter((c: any) => c[3] === 'active').length;
 
-    // Get unique channels
-    const channels = [...new Set(clicks.map((c: any) => c[4]))];
+    // Get unique channels from active clicks
+    const channels = [...new Set(activeClicks.map((c: any) => c[4]))];
 
     // Calculate clicks by date (last 30 days)
     const clicksByDate: { [key: string]: number } = {};
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    clicks.forEach((click: any) => {
+    activeClicks.forEach((click: any) => {
       const timestamp = new Date(click[1]);
       if (timestamp >= thirtyDaysAgo) {
         const dateKey = timestamp.toISOString().split('T')[0];
@@ -97,28 +104,32 @@ router.get('/overview', async (req: Request, res: Response) => {
       clicksByCampaign[campaignId].channels.add(click[4]);
     });
 
-    // Convert to array and add campaign names
-    const campaignStats = Object.values(clicksByCampaign).map((stat: any) => {
-      const campaign = campaigns.find((c: any) => c[0] === stat.campaign_id);
-      return {
-        campaign_id: stat.campaign_id,
-        campaign_name: campaign ? campaign[1] : stat.campaign_id,
-        clicks: stat.clicks,
-        channels: Array.from(stat.channels),
-      };
-    }).sort((a: any, b: any) => b.clicks - a.clicks);
+    // Convert to array and add campaign names (filter to only active campaigns)
+    const campaignStats = Object.values(clicksByCampaign)
+      .map((stat: any) => {
+        const campaign = activeCampaignsData.find((c: any) => c[0] === stat.campaign_id);
+        if (!campaign) return null; // Skip inactive campaigns
+        return {
+          campaign_id: stat.campaign_id,
+          campaign_name: campaign[1],
+          clicks: stat.clicks,
+          channels: Array.from(stat.channels),
+        };
+      })
+      .filter((stat: any) => stat !== null)
+      .sort((a: any, b: any) => b.clicks - a.clicks);
 
-    // Calculate clicks by channel
+    // Calculate clicks by channel (only active campaigns)
     const clicksByChannel: { [key: string]: number } = {};
-    clicks.forEach((click: any) => {
+    activeClicks.forEach((click: any) => {
       const channel = click[4] || 'unknown';
       clicksByChannel[channel] = (clicksByChannel[channel] || 0) + 1;
     });
 
-    // Calculate clicks by hour (for today)
+    // Calculate clicks by hour (for today, only active campaigns)
     const clicksByHour: { [key: number]: number } = {};
     const today = new Date().toISOString().split('T')[0];
-    clicks.forEach((click: any) => {
+    activeClicks.forEach((click: any) => {
       const timestamp = new Date(click[1]);
       if (timestamp.toISOString().split('T')[0] === today) {
         const hour = timestamp.getHours();

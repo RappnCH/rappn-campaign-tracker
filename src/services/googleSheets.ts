@@ -516,3 +516,44 @@ export async function loadPlacementsFromSheets() {
     return [];
   }
 }
+
+// Update campaign status in Google Sheets
+export async function updateCampaignStatusInSheets(campaignId: string, newStatus: string) {
+  const api = await initializeSheets();
+  if (!api) return false;
+
+  try {
+    // First, find the row with this campaign_id
+    const response = await api.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${CAMPAIGNS_SHEET_NAME}!A:D`,
+    });
+
+    const rows = response.data.values || [];
+    
+    // Find the row index (skipping header)
+    const rowIndex = rows.findIndex((row: any, index: number) => index > 0 && row[0] === campaignId);
+    
+    if (rowIndex === -1) {
+      console.log(`Campaign ${campaignId} not found in Google Sheets`);
+      return false;
+    }
+
+    // Update the status column (D = column 4, index 3)
+    const updateRange = `${CAMPAIGNS_SHEET_NAME}!D${rowIndex + 1}`;
+    await api.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: updateRange,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [[newStatus]]
+      }
+    });
+
+    console.log(`✅ Campaign ${campaignId} status updated to ${newStatus} in Google Sheets`);
+    return true;
+  } catch (error) {
+    console.error('❌ Error updating campaign status in Google Sheets:', error);
+    return false;
+  }
+}
