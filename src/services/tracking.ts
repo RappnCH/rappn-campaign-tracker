@@ -117,6 +117,8 @@ router.post('/build-placement-link', async (req: Request, res: Response) => {
     }
 
     const output: TrackingOutput = {
+      campaign_id: input.campaign_id,
+      placement_id: `${input.channel}_${input.ad_type.toLowerCase()}_${input.placement_id_seq}`.toLowerCase(),
       utm_source: utms.utm_source,
       utm_medium: utms.utm_medium,
       utm_campaign: utms.utm_campaign,

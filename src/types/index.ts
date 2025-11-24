@@ -57,6 +57,8 @@ export interface TrackingInput {
 }
 
 export interface TrackingOutput {
+  campaign_id: string;
+  placement_id: string;
   utm_source: string;
   utm_medium: string;
   utm_campaign: string;
