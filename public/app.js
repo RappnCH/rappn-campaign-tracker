@@ -254,12 +254,15 @@ function renderCampaignDetail() {
                                 </div>
                             </div>
                             <div class="space-y-3">
-                                <div class="flex gap-2">
-                                    <input type="text" value="${p.final_url || p.tracked_url}" readonly class="flex-1 px-3 py-2 bg-gray-50 border rounded text-sm font-mono">
-                                    <button onclick="copyUrl('${p.final_url || p.tracked_url}')" class="px-4 py-2 bg-rappn-green text-white rounded hover:opacity-90">Copy</button>
-                                    <button onclick="openTrackedUrl('${p.tracked_url || p.final_url}')" class="px-4 py-2 bg-blue-500 text-white rounded hover:opacity-90">Open & Track</button>
+                                <div class="mb-2">
+                                    <label class="text-xs font-semibold text-rappn-green uppercase tracking-wide">📊 Tracked URL (Use this in your ads!)</label>
                                 </div>
-                                ${p.tracked_url ? `<div class="text-xs text-gray-500">Tracking redirect: <span class="font-mono">${p.tracked_url}</span></div>` : ''}
+                                <div class="flex gap-2">
+                                    <input type="text" value="${p.tracked_url || p.final_url}" readonly class="flex-1 px-3 py-2 bg-green-50 border-2 border-rappn-green rounded text-sm font-mono font-semibold">
+                                    <button onclick="copyUrl('${p.tracked_url || p.final_url}')" class="px-4 py-2 bg-rappn-green text-white rounded hover:opacity-90">Copy Tracked URL</button>
+                                    <button onclick="openTrackedUrl('${p.tracked_url || p.final_url}')" class="px-4 py-2 bg-blue-500 text-white rounded hover:opacity-90">Test</button>
+                                </div>
+                                ${p.final_url ? `<div class="text-xs text-gray-500 mt-2">→ Redirects to: <span class="font-mono">${p.final_url}</span></div>` : ''}
                                 <div class="flex items-center gap-4 p-3 bg-purple-50 rounded-lg">
                                     <div class="flex-shrink-0">
                                         <div id="qr-${p.id}" class="bg-white p-3 rounded" style="width: 200px; height: 200px;"></div>
@@ -748,10 +751,9 @@ function generateQRCodes() {
             // Clear any existing QR code
             container.innerHTML = '';
             try {
-                // Use final_url directly for QR codes to avoid redirect delay
-                // The final_url includes all UTM parameters for tracking
-                const qrTarget = p.final_url || '';
-                console.log('Creating QR code for placement', p.id, 'with final URL:', qrTarget);
+                // Use tracked_url for QR codes to log every scan
+                const qrTarget = p.tracked_url || p.final_url || '';
+                console.log('Creating QR code for placement', p.id, 'with tracked URL:', qrTarget);
                 new QRCode(container, {
                     text: qrTarget,
                     width: 180,
