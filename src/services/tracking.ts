@@ -4,7 +4,10 @@ import { TrackingInput, TrackingOutput } from '../types';
 import { memoryDb } from '../db/memory';
 import { saveClickToSheets, savePlacementToSheets } from './googleSheets';
 
-const trackingBaseUrl = (process.env.TRACKING_BASE_URL || `http://localhost:${process.env.PORT || 3000}`).replace(/\/$/, '');
+// Get tracking base URL dynamically to ensure env vars are loaded
+function getTrackingBaseUrl(): string {
+  return (process.env.TRACKING_BASE_URL || `http://localhost:${process.env.PORT || 3000}`).replace(/\/$/, '');
+}
 
 const router = Router();
 
@@ -94,7 +97,7 @@ router.post('/build-placement-link', async (req: Request, res: Response) => {
 
       try {
         const redirectCode = await memoryDb.createRedirectCode(placement.id || 0, final_url);
-        tracked_url = `${trackingBaseUrl}/r/${redirectCode}`;
+        tracked_url = `${getTrackingBaseUrl()}/r/${redirectCode}`;
         placement.redirect_code = redirectCode;
         placement.tracked_url = tracked_url;
       } catch (redirectError) {
