@@ -117,4 +117,3 @@ Foglio ufficiale Rappn: [Rappn Campaign Tracker Sheet](https://docs.google.com/s
 
 ---
 
-Per qualsiasi dubbio apri una issue su GitHub o contatta il team Growth.
