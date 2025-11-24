@@ -33,7 +33,12 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 // Health check
 app.get('/health', (req: any, res: any) => {
-  res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    tracking_base_url: process.env.TRACKING_BASE_URL || 'NOT_SET',
+    port: process.env.PORT || '3000'
+  });
 });
 
 // API Routes
