@@ -12,6 +12,7 @@ let wizardStep = 1;
 let newCampaignData = {};
 let charts = {};
 let campaignFilter = 'active'; // 'active', 'inactive', or 'all'
+let reactivatingCampaign = null; // For the reactivation modal
 
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', async function() {
@@ -65,6 +66,10 @@ function renderApp() {
                         <span>📈</span>
                         <span class="font-medium">Performance</span>
                     </button>
+                    <button onclick="switchView('archive')" class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 ${currentView === 'archive' ? 'bg-gradient-to-r from-rappn-green to-rappn-blue text-white' : 'text-gray-700 hover:bg-gray-100'}">
+                        <span>🗄️</span>
+                        <span class="font-medium">Archive</span>
+                    </button>
                     <button onclick="switchView('settings')" class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg ${currentView === 'settings' ? 'bg-gradient-to-r from-rappn-green to-rappn-blue text-white' : 'text-gray-700 hover:bg-gray-100'}">
                         <span>⚙️</span>
                         <span class="font-medium">Settings</span>
@@ -104,6 +109,8 @@ function renderCurrentView() {
             return renderCampaignDetail();
         case 'performance':
             return renderPerformance();
+        case 'archive':
+            return renderArchive();
         case 'assets':
             return renderAssets();
         case 'settings':
@@ -373,6 +380,128 @@ function renderAssets() {
             </div>
             <div class="bg-white rounded-2xl shadow-md p-6">
                 <p class="text-gray-500 text-center py-8">Asset management coming soon...</p>
+            </div>
+        </div>
+    `;
+}
+
+function renderArchive() {
+    const inactiveCampaigns = campaigns.filter(c => c.status === 'inactive');
+    const totalCampaigns = campaigns.length;
+    const activeCampaigns = campaigns.filter(c => c.status === 'active').length;
+    const inactiveCount = inactiveCampaigns.length;
+
+    return `
+        <div class="p-6">
+            <h2 class="text-3xl font-bold text-gray-900 mb-6">Campaign Archive</h2>
+            
+            <!-- Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div class="bg-white rounded-2xl shadow-md p-6">
+                    <div class="text-gray-500 text-sm mb-2">Total Campaigns</div>
+                    <div class="text-3xl font-bold text-gray-900">${totalCampaigns}</div>
+                    <div class="text-xs text-gray-400 mt-1">Active + Inactive</div>
+                </div>
+                <div class="bg-white rounded-2xl shadow-md p-6">
+                    <div class="text-gray-500 text-sm mb-2">Active Campaigns</div>
+                    <div class="text-3xl font-bold text-green-600">${activeCampaigns}</div>
+                    <div class="text-xs text-gray-400 mt-1">Currently running</div>
+                </div>
+                <div class="bg-white rounded-2xl shadow-md p-6">
+                    <div class="text-gray-500 text-sm mb-2">Inactive/Deleted</div>
+                    <div class="text-3xl font-bold text-red-600">${inactiveCount}</div>
+                    <div class="text-xs text-gray-400 mt-1">Archived campaigns</div>
+                </div>
+            </div>
+
+            <!-- Inactive Campaigns Table -->
+            <div class="bg-white rounded-2xl shadow-md overflow-hidden">
+                <div class="p-4 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-900">Inactive & Deleted Campaigns</h3>
+                </div>
+                ${inactiveCampaigns.length === 0 ? `
+                    <div class="p-12 text-center">
+                        <div class="text-6xl mb-4">🗄️</div>
+                        <p class="text-gray-500 text-lg">No archived campaigns</p>
+                        <p class="text-gray-400 text-sm mt-2">Deleted or inactive campaigns will appear here</p>
+                    </div>
+                ` : `
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Campaign Name</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">ID</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Geo</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Language</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Original Dates</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                ${inactiveCampaigns.map(campaign => `
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-6 py-4">
+                                            <div class="font-medium text-gray-900">${campaign.name}</div>
+                                            <div class="text-sm text-gray-500">${campaign.concept}</div>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <code class="text-xs bg-gray-100 px-2 py-1 rounded">${campaign.campaign_id}</code>
+                                        </td>
+                                        <td class="px-6 py-4 text-sm text-gray-700">${campaign.geo}</td>
+                                        <td class="px-6 py-4 text-sm text-gray-700">${campaign.language}</td>
+                                        <td class="px-6 py-4 text-sm text-gray-700">
+                                            ${campaign.date_start ? new Date(campaign.date_start).toLocaleDateString() : 'N/A'}
+                                            ${campaign.date_end ? ' - ' + new Date(campaign.date_end).toLocaleDateString() : ''}
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <button onclick="showReactivateModal('${campaign.campaign_id}')" class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm font-medium">
+                                                ♻️ Reactivate
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `}
+            </div>
+        </div>
+
+        <!-- Reactivation Modal -->
+        ${reactivatingCampaign ? renderReactivateModal() : ''}
+    `;
+}
+
+function renderReactivateModal() {
+    const campaign = campaigns.find(c => c.campaign_id === reactivatingCampaign);
+    if (!campaign) return '';
+
+    return `
+        <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onclick="if(event.target === this) closeReactivateModal()">
+            <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4" onclick="event.stopPropagation()">
+                <h3 class="text-2xl font-bold text-gray-900 mb-4">Reactivate Campaign</h3>
+                <p class="text-gray-600 mb-6">Set new dates to reactivate: <strong>${campaign.name}</strong></p>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                        <input type="date" id="reactivate-start-date" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rappn-green" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">End Date (Optional)</label>
+                        <input type="date" id="reactivate-end-date" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rappn-green">
+                    </div>
+                </div>
+
+                <div class="flex gap-3 mt-6">
+                    <button onclick="closeReactivateModal()" class="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium">
+                        Cancel
+                    </button>
+                    <button onclick="confirmReactivate()" class="flex-1 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 font-medium">
+                        Reactivate Campaign
+                    </button>
+                </div>
             </div>
         </div>
     `;
@@ -1642,6 +1771,56 @@ window.deleteCampaign = async function(campaignId) {
     } catch (error) {
         console.error('Error deleting campaign:', error);
         alert('Failed to delete campaign');
+    }
+};
+
+// Show reactivation modal
+window.showReactivateModal = function(campaignId) {
+    reactivatingCampaign = campaignId;
+    renderApp();
+};
+
+// Close reactivation modal
+window.closeReactivateModal = function() {
+    reactivatingCampaign = null;
+    renderApp();
+};
+
+// Confirm campaign reactivation
+window.confirmReactivate = async function() {
+    const startDate = document.getElementById('reactivate-start-date').value;
+    const endDate = document.getElementById('reactivate-end-date').value;
+    
+    if (!startDate) {
+        alert('Please select a start date');
+        return;
+    }
+    
+    const campaign = campaigns.find(c => c.campaign_id === reactivatingCampaign);
+    if (!campaign) return;
+    
+    try {
+        // Update campaign with new dates and set to active
+        const response = await fetch(`${API_BASE}/campaigns/${reactivatingCampaign}/reactivate`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                date_start: startDate,
+                date_end: endDate || null
+            })
+        });
+        
+        if (response.ok) {
+            alert(`Campaign "${campaign.name}" reactivated successfully!`);
+            reactivatingCampaign = null;
+            await loadCampaigns();
+            renderApp();
+        } else {
+            alert('Failed to reactivate campaign');
+        }
+    } catch (error) {
+        console.error('Error reactivating campaign:', error);
+        alert('Failed to reactivate campaign');
     }
 };
 

@@ -206,4 +206,51 @@ router.patch('/:id/status', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * PATCH /campaigns/:id/reactivate
+ * Reactivate a campaign with new dates
+ */
+router.patch('/:id/reactivate', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { date_start, date_end } = req.body;
+
+    if (!date_start) {
+      return res.status(400).json({
+        error: 'Start date is required',
+      });
+    }
+
+    const campaign = await memoryDb.getCampaignById(id);
+    if (!campaign) {
+      return res.status(404).json({
+        error: 'Campaign not found',
+      });
+    }
+
+    // Update campaign with new dates and set to active
+    const result = await memoryDb.updateCampaign(id, {
+      status: 'active',
+      date_start,
+      date_end: date_end || campaign.date_end,
+    });
+
+    // Update in Google Sheets
+    updateCampaignStatusInSheets(id, 'active').catch(err => 
+      console.error('Failed to update campaign status in Google Sheets:', err)
+    );
+
+    res.json({
+      message: 'Campaign reactivated successfully',
+      campaign: result,
+    });
+  } catch (error) {
+    console.error('Error reactivating campaign:', error);
+    res.status(500).json({
+      error: 'Failed to reactivate campaign',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 export default router;
