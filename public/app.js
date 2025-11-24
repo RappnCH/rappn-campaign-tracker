@@ -178,9 +178,19 @@ function renderDashboard() {
                                     <td class="px-6 py-4 text-sm text-gray-700">${campaign.geo}</td>
                                     <td class="px-6 py-4 text-sm text-gray-700">${campaign.language}</td>
                                     <td class="px-6 py-4">
-                                        <button onclick="viewCampaign('${campaign.campaign_id}')" class="text-rappn-blue hover:underline text-sm font-medium">
-                                            View Details →
-                                        </button>
+                                        <div class="flex items-center gap-2">
+                                            <button onclick="viewCampaign('${campaign.campaign_id}')" class="text-rappn-blue hover:underline text-sm font-medium">
+                                                View Details
+                                            </button>
+                                            <span class="text-gray-300">|</span>
+                                            <button onclick="toggleCampaignStatus('${campaign.campaign_id}')" class="text-yellow-600 hover:text-yellow-700 text-sm font-medium" title="${campaign.status === 'active' ? 'Set Inactive' : 'Set Active'}">
+                                                ${campaign.status === 'active' ? 'Deactivate' : 'Activate'}
+                                            </button>
+                                            <span class="text-gray-300">|</span>
+                                            <button onclick="deleteCampaign('${campaign.campaign_id}')" class="text-red-600 hover:text-red-700 text-sm font-medium" title="Delete Campaign">
+                                                Delete
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             `).join('')}
