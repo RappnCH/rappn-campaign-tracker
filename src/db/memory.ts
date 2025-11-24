@@ -82,6 +82,12 @@ export const memoryDb = {
     return null;
   },
 
+  async deleteAllPlacementsForCampaign(campaign_id: string): Promise<void> {
+    placements.delete(campaign_id);
+    // Also clear related clicks
+    clicks.delete(`campaign_${campaign_id}`);
+  },
+
   // Click Tracking
   async recordClick(data: { placement_id?: number; campaign_id?: string; url: string; user_agent?: string; ip?: string }): Promise<void> {
     const click = {

@@ -160,6 +160,24 @@ router.get('/placements/:campaign_id', async (req: Request, res: Response) => {
 });
 
 /**
+ * DELETE /tracking/placements/:campaign_id
+ * Delete all placements for a campaign
+ */
+router.delete('/placements/:campaign_id', async (req: Request, res: Response) => {
+  try {
+    const { campaign_id } = req.params;
+    await memoryDb.deleteAllPlacementsForCampaign(campaign_id);
+    res.json({ success: true, message: `All placements deleted for campaign ${campaign_id}` });
+  } catch (error) {
+    console.error('Error deleting placements:', error);
+    res.status(500).json({
+      error: 'Failed to delete placements',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
  * POST /tracking/click
  * Record a click for analytics
  */
