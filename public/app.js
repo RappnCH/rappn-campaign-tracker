@@ -1,14 +1,16 @@
 // Rappn Marketing Campaign Manager
 console.log('App starting...');
 
-const API_BASE = 'http://localhost:3000';
+const API_BASE = window.location.origin;
 let campaigns = [];
 let currentView = 'dashboard';
 let selectedCampaign = null;
 let placements = [];
 let campaignAnalytics = null;
+let overviewAnalytics = null;
 let wizardStep = 1;
 let newCampaignData = {};
+let charts = {};
 
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', async function() {
@@ -81,6 +83,14 @@ function renderApp() {
         setTimeout(() => {
             console.log('Attempting to generate QR codes...');
             generateQRCodes();
+        }, 200);
+    }
+    
+    // Render charts after DOM is updated
+    if (currentView === 'performance') {
+        setTimeout(() => {
+            console.log('Attempting to render charts...');
+            renderCharts();
         }, 200);
     }
 }
@@ -581,159 +591,258 @@ function renderWizardStep() {
 }
 
 function renderPerformance() {
-    console.log('renderPerformance called');
-    console.log('selectedCampaign:', selectedCampaign);
-    console.log('campaignAnalytics:', campaignAnalytics);
-    
-    if (!selectedCampaign || !campaignAnalytics) {
-        console.log('No campaign or analytics, showing selection page');
+    // Show overall analytics if no campaign is selected
+    if (!selectedCampaign) {
         return `
             <div class="p-6">
-                <h2 class="text-3xl font-bold text-gray-900 mb-6">Campaign Performance</h2>
-                <div class="bg-white rounded-2xl shadow-md p-8">
-                    <p class="text-gray-500 mb-6 text-center">Select a campaign to view its performance analytics</p>
-                    
-                    ${campaigns.length === 0 ? `
-                        <p class="text-center text-gray-400">No campaigns available</p>
-                    ` : `
-                        <div class="grid grid-cols-1 gap-4">
-                            ${campaigns.map(c => `
-                                <div class="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer" onclick="viewPerformance('${c.campaign_id}')">
-                                    <div class="flex justify-between items-center">
-                                        <div>
-                                            <h3 class="font-semibold text-lg">${c.name}</h3>
-                                            <p class="text-sm text-gray-500">${c.campaign_id}</p>
+                <h2 class="text-3xl font-bold text-gray-900 mb-6">Performance Overview</h2>
+                
+                <!-- Loading state -->
+                ${!overviewAnalytics ? `
+                    <div class="bg-white rounded-2xl shadow-md p-8 text-center">
+                        <div class="text-4xl mb-4">📊</div>
+                        <p class="text-gray-500">Loading analytics...</p>
+                    </div>
+                ` : `
+                    <!-- Summary Stats -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                        <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl shadow-md p-6 text-white">
+                            <div class="text-sm opacity-90 mb-2">Total Clicks</div>
+                            <div class="text-4xl font-bold">${overviewAnalytics.summary.total_clicks.toLocaleString()}</div>
+                        </div>
+                        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-md p-6 text-white">
+                            <div class="text-sm opacity-90 mb-2">Total Campaigns</div>
+                            <div class="text-4xl font-bold">${overviewAnalytics.summary.total_campaigns}</div>
+                        </div>
+                        <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl shadow-md p-6 text-white">
+                            <div class="text-sm opacity-90 mb-2">Active Campaigns</div>
+                            <div class="text-4xl font-bold">${overviewAnalytics.summary.active_campaigns}</div>
+                        </div>
+                        <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl shadow-md p-6 text-white">
+                            <div class="text-sm opacity-90 mb-2">Channels</div>
+                            <div class="text-4xl font-bold">${overviewAnalytics.summary.channels}</div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Row 1 -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                        <!-- Clicks Over Time -->
+                        <div class="bg-white rounded-2xl shadow-md p-6">
+                            <h3 class="text-xl font-bold mb-4">Clicks Over Time (Last 30 Days)</h3>
+                            <canvas id="clicksOverTimeChart" height="250"></canvas>
+                        </div>
+
+                        <!-- Clicks by Channel -->
+                        <div class="bg-white rounded-2xl shadow-md p-6">
+                            <h3 class="text-xl font-bold mb-4">Clicks by Channel</h3>
+                            <canvas id="clicksByChannelChart" height="250"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Charts Row 2 -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                        <!-- Clicks by Hour -->
+                        <div class="bg-white rounded-2xl shadow-md p-6">
+                            <h3 class="text-xl font-bold mb-4">Clicks by Hour (Today)</h3>
+                            <canvas id="clicksByHourChart" height="250"></canvas>
+                        </div>
+
+                        <!-- Top Campaigns -->
+                        <div class="bg-white rounded-2xl shadow-md p-6">
+                            <h3 class="text-xl font-bold mb-4">Top Campaigns by Clicks</h3>
+                            <div class="space-y-3 max-h-80 overflow-y-auto">
+                                ${overviewAnalytics.clicks_by_campaign.slice(0, 10).map((c, i) => `
+                                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer" onclick="viewCampaignAnalytics('${c.campaign_id}')">
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-8 h-8 rounded-full bg-gradient-to-r from-rappn-green to-rappn-blue text-white flex items-center justify-center font-bold text-sm">
+                                                ${i + 1}
+                                            </div>
+                                            <div>
+                                                <div class="font-semibold">${c.campaign_name}</div>
+                                                <div class="text-xs text-gray-500">${c.channels.join(', ')}</div>
+                                            </div>
                                         </div>
-                                        <button class="px-4 py-2 bg-gradient-to-r from-rappn-green to-rappn-blue text-white rounded-lg hover:opacity-90">
-                                            View Analytics →
-                                        </button>
+                                        <div class="text-2xl font-bold text-rappn-green">${c.clicks}</div>
                                     </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `}
+            </div>
+        `;
+    }
+
+    // Show campaign-specific analytics
+    return `
+        <div class="p-6">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <button onclick="selectedCampaign = null; campaignAnalytics = null; currentView = 'performance'; renderApp();" class="text-rappn-blue hover:underline mb-2">
+                        ← Back to Overview
+                    </button>
+                    <h2 class="text-3xl font-bold text-gray-900">${selectedCampaign.name}</h2>
+                    <p class="text-gray-600 mt-1">${selectedCampaign.campaign_id}</p>
+                </div>
+                <button onclick="switchView('campaign-detail')" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+                    Edit Campaign
+                </button>
+            </div>
+
+            ${!campaignAnalytics ? `
+                <div class="bg-white rounded-2xl shadow-md p-8 text-center">
+                    <div class="text-4xl mb-4">📊</div>
+                    <p class="text-gray-500">Loading campaign analytics...</p>
+                </div>
+            ` : `
+                <!-- Summary Stats -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                    <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl shadow-md p-6 text-white">
+                        <div class="text-sm opacity-90 mb-2">Total Clicks</div>
+                        <div class="text-4xl font-bold">${campaignAnalytics.summary.total_clicks.toLocaleString()}</div>
+                    </div>
+                    <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-md p-6 text-white">
+                        <div class="text-sm opacity-90 mb-2">Placements</div>
+                        <div class="text-4xl font-bold">${campaignAnalytics.summary.total_placements}</div>
+                    </div>
+                    <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl shadow-md p-6 text-white">
+                        <div class="text-sm opacity-90 mb-2">Channels</div>
+                        <div class="text-4xl font-bold">${campaignAnalytics.summary.channels}</div>
+                    </div>
+                    <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl shadow-md p-6 text-white">
+                        <div class="text-sm opacity-90 mb-2">Status</div>
+                        <div class="text-2xl font-bold">${campaignAnalytics.campaign.status.toUpperCase()}</div>
+                    </div>
+                </div>
+
+                <!-- Charts Row 1 -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <!-- Clicks Over Time -->
+                    <div class="bg-white rounded-2xl shadow-md p-6">
+                        <h3 class="text-xl font-bold mb-4">Clicks Over Time</h3>
+                        <canvas id="campaignClicksOverTimeChart" height="250"></canvas>
+                    </div>
+
+                    <!-- Clicks by Channel -->
+                    <div class="bg-white rounded-2xl shadow-md p-6">
+                        <h3 class="text-xl font-bold mb-4">Clicks by Channel</h3>
+                        <canvas id="campaignClicksByChannelChart" height="250"></canvas>
+                    </div>
+                </div>
+
+                <!-- Charts Row 2 -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <!-- Clicks by Hour -->
+                    <div class="bg-white rounded-2xl shadow-md p-6">
+                        <h3 class="text-xl font-bold mb-4">Clicks by Hour</h3>
+                        <canvas id="campaignClicksByHourChart" height="250"></canvas>
+                    </div>
+
+                    <!-- Clicks by Day of Week -->
+                    <div class="bg-white rounded-2xl shadow-md p-6">
+                        <h3 class="text-xl font-bold mb-4">Clicks by Day of Week</h3>
+                        <canvas id="campaignClicksByDayChart" height="250"></canvas>
+                    </div>
+                </div>
+
+                <!-- Placement Performance Table -->
+                <div class="bg-white rounded-2xl shadow-md p-6 mb-6">
+                    <h3 class="text-xl font-bold mb-4">Placement Performance</h3>
+                    ${campaignAnalytics.clicks_by_placement.length === 0 ? `
+                        <p class="text-center py-8 text-gray-500">No placements created yet</p>
+                    ` : `
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Placement ID</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Channel</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Ad Type</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Clicks</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Performance</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y">
+                                    ${campaignAnalytics.clicks_by_placement
+                                        .sort((a, b) => b.clicks - a.clicks)
+                                        .map(p => {
+                                            const maxClicks = Math.max(...campaignAnalytics.clicks_by_placement.map(pl => pl.clicks));
+                                            const percentage = maxClicks > 0 ? (p.clicks / maxClicks) * 100 : 0;
+                                            return `
+                                                <tr class="hover:bg-gray-50">
+                                                    <td class="px-4 py-3 font-medium">#${p.placement_id}</td>
+                                                    <td class="px-4 py-3">${p.channel}</td>
+                                                    <td class="px-4 py-3">
+                                                        <span class="px-2 py-1 bg-gray-100 rounded text-xs">${p.ad_type}</span>
+                                                    </td>
+                                                    <td class="px-4 py-3">
+                                                        <span class="text-2xl font-bold text-rappn-green">${p.clicks}</span>
+                                                    </td>
+                                                    <td class="px-4 py-3">
+                                                        <div class="w-full bg-gray-200 rounded-full h-2">
+                                                            <div class="bg-gradient-to-r from-rappn-green to-rappn-blue h-2 rounded-full" style="width: ${percentage}%"></div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            `;
+                                        }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `}
+                </div>
+
+                <!-- Recent Clicks -->
+                <div class="bg-white rounded-2xl shadow-md p-6">
+                    <h3 class="text-xl font-bold mb-4">Recent Clicks</h3>
+                    ${campaignAnalytics.recent_clicks.length === 0 ? `
+                        <p class="text-center py-8 text-gray-500">No clicks yet</p>
+                    ` : `
+                        <div class="space-y-2">
+                            ${campaignAnalytics.recent_clicks.map(click => `
+                                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="text-2xl">${click.channel === 'facebook' ? '📘' : click.channel === 'instagram' ? '📷' : click.channel === 'google' ? '🔍' : '🔗'}</div>
+                                        <div>
+                                            <div class="font-medium">${click.channel} - ${click.utm_content}</div>
+                                            <div class="text-xs text-gray-500">${new Date(click.timestamp).toLocaleString()}</div>
+                                        </div>
+                                    </div>
+                                    <div class="text-xs text-gray-400">${click.ip}</div>
                                 </div>
                             `).join('')}
                         </div>
                     `}
                 </div>
-            </div>
-        `;
-    }
-
-    const totalClicks = campaignAnalytics.total_clicks || 0;
-    const totalPlacements = campaignAnalytics.total_placements || 0;
-    const avgClicksPerPlacement = totalPlacements > 0 ? (totalClicks / totalPlacements).toFixed(1) : 0;
-    
-    console.log('Rendering analytics with:', { totalClicks, totalPlacements, avgClicksPerPlacement });
-
-    return `
-        <div class="p-6">
-            <div class="flex justify-between items-center mb-6">
-                <div>
-                    <h2 class="text-3xl font-bold text-gray-900">${selectedCampaign.name}</h2>
-                    <p class="text-gray-600 mt-1">Performance Analytics</p>
-                </div>
-                <button onclick="switchView('campaign-detail')" class="text-rappn-blue hover:underline">
-                    ← Back to Campaign
-                </button>
-            </div>
-
-            <!-- Key Metrics -->
-            <div class="grid grid-cols-4 gap-6 mb-6">
-                <div class="bg-white rounded-2xl shadow-md p-6">
-                    <div class="text-gray-500 text-sm mb-2">Total Clicks</div>
-                    <div class="text-3xl font-bold text-rappn-green">${totalClicks}</div>
-                </div>
-                <div class="bg-white rounded-2xl shadow-md p-6">
-                    <div class="text-gray-500 text-sm mb-2">Placements</div>
-                    <div class="text-3xl font-bold text-blue-600">${totalPlacements}</div>
-                </div>
-                <div class="bg-white rounded-2xl shadow-md p-6">
-                    <div class="text-gray-500 text-sm mb-2">Avg Clicks/Placement</div>
-                    <div class="text-3xl font-bold text-purple-600">${avgClicksPerPlacement}</div>
-                </div>
-                <div class="bg-white rounded-2xl shadow-md p-6">
-                    <div class="text-gray-500 text-sm mb-2">Status</div>
-                    <div class="text-lg font-bold ${selectedCampaign.status === 'active' ? 'text-green-600' : 'text-blue-600'}">${selectedCampaign.status.toUpperCase()}</div>
-                </div>
-            </div>
-
-            <!-- Placement Breakdown -->
-            <div class="bg-white rounded-2xl shadow-md p-6 mb-6">
-                <h3 class="text-xl font-bold mb-4">Click Trend (Last 7 Days)</h3>
-                <div class="h-64 flex items-center justify-center">
-                    ${totalClicks === 0 ? `
-                        <div class="text-center">
-                            <div class="text-6xl mb-4">📊</div>
-                            <p class="text-gray-500">No click data yet</p>
-                            <p class="text-sm text-gray-400 mt-2">Start tracking links to see performance charts</p>
-                        </div>
-                    ` : `
-                        <div class="w-full h-full flex items-end justify-around gap-2 pb-4">
-                            ${Array.from({length: 7}, (_, i) => {
-                                const dayClicks = Math.floor(totalClicks / 7) + (i === 6 ? totalClicks % 7 : 0);
-                                const height = totalClicks > 0 ? Math.max(20, (dayClicks / totalClicks) * 200) : 20;
-                                return `
-                                    <div class="flex flex-col items-center flex-1">
-                                        <div class="w-full bg-gradient-to-t from-rappn-green to-rappn-blue rounded-t" style="height: ${height}px;"></div>
-                                        <div class="text-xs mt-2 text-gray-600">${dayClicks}</div>
-                                        <div class="text-xs text-gray-400">Day ${i + 1}</div>
-                                    </div>
-                                `;
-                            }).join('')}
-                        </div>
-                    `}
-                </div>
-            </div>
-
-            <!-- Placement Breakdown -->
-            <div class="bg-white rounded-2xl shadow-md p-6">
-                <h3 class="text-xl font-bold mb-4">Placement Performance</h3>
-                ${campaignAnalytics.placements.length === 0 ? `
-                    <p class="text-center py-8 text-gray-500">No placements created yet</p>
-                ` : `
-                    <div class="overflow-x-auto">
-                        <table class="w-full">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Placement</th>
-                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Channel</th>
-                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Ad Type</th>
-                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Medium</th>
-                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">Clicks</th>
-                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600">URL</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y">
-                                ${campaignAnalytics.placements.map(p => `
-                                    <tr class="hover:bg-gray-50">
-                                        <td class="px-4 py-3 font-medium">#${p.placement_id}</td>
-                                        <td class="px-4 py-3">${p.channel}</td>
-                                        <td class="px-4 py-3">${p.ad_type}</td>
-                                        <td class="px-4 py-3">
-                                            <span class="px-2 py-1 bg-gray-100 rounded text-xs">${p.medium}</span>
-                                        </td>
-                                        <td class="px-4 py-3">
-                                            <span class="text-lg font-bold text-rappn-green">${p.clicks}</span>
-                                        </td>
-                                        <td class="px-4 py-3">
-                                            <button onclick="copyUrl('${p.tracked_url || p.final_url}')" class="text-rappn-blue hover:underline text-sm">
-                                                Copy Link
-                                            </button>
-                                        </td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                `}
-            </div>
+            `}
         </div>
     `;
 }
 
 // Navigation
-window.switchView = function(view) {
+window.switchView = async function(view) {
     currentView = view;
-    selectedCampaign = null;
-    campaignAnalytics = null;
+    
+    // Load analytics data when switching to performance view
+    if (view === 'performance') {
+        if (!selectedCampaign) {
+            // Load overview analytics
+            overviewAnalytics = null;
+            renderApp();
+            await loadOverviewAnalytics();
+            renderApp();
+        }
+    } else {
+        // Clear analytics and charts when leaving performance view
+        destroyCharts();
+        overviewAnalytics = null;
+        campaignAnalytics = null;
+    }
+    
+    if (view !== 'campaign-detail' && view !== 'performance') {
+        selectedCampaign = null;
+    }
+    
     renderApp();
 };
 
@@ -769,6 +878,292 @@ function generateQRCodes() {
             console.warn('QR container not found for placement', p.id);
         }
     });
+}
+
+// Load overview analytics
+async function loadOverviewAnalytics() {
+    try {
+        const response = await fetch(`${API_BASE}/analytics/overview`);
+        if (!response.ok) throw new Error('Failed to load overview analytics');
+        overviewAnalytics = await response.json();
+        console.log('Overview analytics loaded:', overviewAnalytics);
+    } catch (error) {
+        console.error('Error loading overview analytics:', error);
+        alert('Failed to load performance data');
+    }
+}
+
+// Load campaign-specific analytics
+async function loadCampaignAnalytics(campaign_id) {
+    try {
+        const response = await fetch(`${API_BASE}/analytics/campaign/${campaign_id}`);
+        if (!response.ok) throw new Error('Failed to load campaign analytics');
+        campaignAnalytics = await response.json();
+        console.log('Campaign analytics loaded:', campaignAnalytics);
+    } catch (error) {
+        console.error('Error loading campaign analytics:', error);
+        alert('Failed to load campaign performance data');
+    }
+}
+
+// View campaign analytics
+async function viewCampaignAnalytics(campaign_id) {
+    const campaign = campaigns.find(c => c.campaign_id === campaign_id);
+    if (!campaign) return;
+    
+    selectedCampaign = campaign;
+    campaignAnalytics = null; // Reset to show loading state
+    currentView = 'performance';
+    renderApp();
+    
+    // Load analytics data
+    await loadCampaignAnalytics(campaign_id);
+    renderApp();
+}
+
+// Destroy all charts to prevent memory leaks
+function destroyCharts() {
+    Object.keys(charts).forEach(key => {
+        if (charts[key]) {
+            charts[key].destroy();
+            delete charts[key];
+        }
+    });
+}
+
+// Render charts after the DOM is updated
+function renderCharts() {
+    // Destroy existing charts first
+    destroyCharts();
+
+    if (!selectedCampaign && overviewAnalytics) {
+        // Overview charts
+        renderOverviewCharts();
+    } else if (selectedCampaign && campaignAnalytics) {
+        // Campaign-specific charts
+        renderCampaignCharts();
+    }
+}
+
+// Render overview charts
+function renderOverviewCharts() {
+    // Clicks over time
+    const clicksOverTimeCanvas = document.getElementById('clicksOverTimeChart');
+    if (clicksOverTimeCanvas) {
+        const dates = overviewAnalytics.clicks_by_date.map(d => d.date);
+        const clicks = overviewAnalytics.clicks_by_date.map(d => d.clicks);
+        
+        charts.clicksOverTime = new Chart(clicksOverTimeCanvas, {
+            type: 'line',
+            data: {
+                labels: dates,
+                datasets: [{
+                    label: 'Clicks',
+                    data: clicks,
+                    borderColor: '#3aaa35',
+                    backgroundColor: 'rgba(58, 170, 53, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    }
+
+    // Clicks by channel
+    const clicksByChannelCanvas = document.getElementById('clicksByChannelChart');
+    if (clicksByChannelCanvas && overviewAnalytics.clicks_by_channel.length > 0) {
+        const channels = overviewAnalytics.clicks_by_channel.map(c => c.channel);
+        const clicks = overviewAnalytics.clicks_by_channel.map(c => c.clicks);
+        
+        charts.clicksByChannel = new Chart(clicksByChannelCanvas, {
+            type: 'doughnut',
+            data: {
+                labels: channels,
+                datasets: [{
+                    data: clicks,
+                    backgroundColor: [
+                        '#3aaa35',
+                        '#18a19a',
+                        '#fbbf24',
+                        '#f59e0b',
+                        '#ef4444',
+                        '#8b5cf6'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+    }
+
+    // Clicks by hour
+    const clicksByHourCanvas = document.getElementById('clicksByHourChart');
+    if (clicksByHourCanvas && overviewAnalytics.clicks_by_hour.length > 0) {
+        const hours = overviewAnalytics.clicks_by_hour.map(h => `${h.hour}:00`);
+        const clicks = overviewAnalytics.clicks_by_hour.map(h => h.clicks);
+        
+        charts.clicksByHour = new Chart(clicksByHourCanvas, {
+            type: 'bar',
+            data: {
+                labels: hours,
+                datasets: [{
+                    label: 'Clicks',
+                    data: clicks,
+                    backgroundColor: '#18a19a'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    }
+}
+
+// Render campaign-specific charts
+function renderCampaignCharts() {
+    // Clicks over time
+    const clicksOverTimeCanvas = document.getElementById('campaignClicksOverTimeChart');
+    if (clicksOverTimeCanvas) {
+        const dates = campaignAnalytics.clicks_by_date.map(d => d.date);
+        const clicks = campaignAnalytics.clicks_by_date.map(d => d.clicks);
+        
+        charts.campaignClicksOverTime = new Chart(clicksOverTimeCanvas, {
+            type: 'line',
+            data: {
+                labels: dates,
+                datasets: [{
+                    label: 'Clicks',
+                    data: clicks,
+                    borderColor: '#3aaa35',
+                    backgroundColor: 'rgba(58, 170, 53, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    }
+
+    // Clicks by channel
+    const clicksByChannelCanvas = document.getElementById('campaignClicksByChannelChart');
+    if (clicksByChannelCanvas && campaignAnalytics.clicks_by_channel.length > 0) {
+        const channels = campaignAnalytics.clicks_by_channel.map(c => c.channel);
+        const clicks = campaignAnalytics.clicks_by_channel.map(c => c.clicks);
+        
+        charts.campaignClicksByChannel = new Chart(clicksByChannelCanvas, {
+            type: 'doughnut',
+            data: {
+                labels: channels,
+                datasets: [{
+                    data: clicks,
+                    backgroundColor: [
+                        '#3aaa35',
+                        '#18a19a',
+                        '#fbbf24',
+                        '#f59e0b',
+                        '#ef4444',
+                        '#8b5cf6'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+    }
+
+    // Clicks by hour
+    const clicksByHourCanvas = document.getElementById('campaignClicksByHourChart');
+    if (clicksByHourCanvas && campaignAnalytics.clicks_by_hour.length > 0) {
+        const hours = campaignAnalytics.clicks_by_hour.map(h => `${h.hour}:00`);
+        const clicks = campaignAnalytics.clicks_by_hour.map(h => h.clicks);
+        
+        charts.campaignClicksByHour = new Chart(clicksByHourCanvas, {
+            type: 'bar',
+            data: {
+                labels: hours,
+                datasets: [{
+                    label: 'Clicks',
+                    data: clicks,
+                    backgroundColor: '#18a19a'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    }
+
+    // Clicks by day of week
+    const clicksByDayCanvas = document.getElementById('campaignClicksByDayChart');
+    if (clicksByDayCanvas && campaignAnalytics.clicks_by_day_of_week.length > 0) {
+        const days = campaignAnalytics.clicks_by_day_of_week.map(d => d.day_of_week);
+        const clicks = campaignAnalytics.clicks_by_day_of_week.map(d => d.clicks);
+        
+        charts.campaignClicksByDay = new Chart(clicksByDayCanvas, {
+            type: 'bar',
+            data: {
+                labels: days,
+                datasets: [{
+                    label: 'Clicks',
+                    data: clicks,
+                    backgroundColor: '#3aaa35'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    }
 }
 
 window.viewCampaign = async function(campaignId) {
@@ -935,31 +1330,9 @@ window.createCampaign = async function() {
     }
 };
 
-// Performance tracking
+// Performance tracking (updated to use new analytics endpoints)
 window.viewPerformance = async function(campaignId) {
-    console.log('Loading performance for campaign:', campaignId);
-    selectedCampaign = campaigns.find(c => c.campaign_id === campaignId);
-    if (!selectedCampaign) {
-        console.error('Campaign not found:', campaignId);
-        return;
-    }
-    
-    try {
-        console.log('Fetching analytics from:', `${API_BASE}/analytics/campaign/${campaignId}`);
-        const response = await fetch(`${API_BASE}/analytics/campaign/${campaignId}`);
-        const data = await response.json();
-        campaignAnalytics = data;
-        console.log('Analytics loaded successfully:', data);
-        console.log('Total clicks:', data.total_clicks);
-        console.log('Placements:', data.placements);
-    } catch (error) {
-        console.error('Error loading analytics:', error);
-        campaignAnalytics = { total_clicks: 0, total_placements: 0, placements: [] };
-    }
-    
-    currentView = 'performance';
-    console.log('Switching to performance view, campaignAnalytics:', campaignAnalytics);
-    renderApp();
+    await viewCampaignAnalytics(campaignId);
 };
 
 window.testClick = async function(placementId, url, campaignId) {

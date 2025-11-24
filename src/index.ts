@@ -5,6 +5,7 @@ import * as path from 'path';
 import idsRouter from './services/ids';
 import campaignsRouter from './services/campaigns';
 import trackingRouter from './services/tracking';
+import analyticsRouter from './services/analytics';
 import { memoryDb } from './db/memory';
 import { setupGoogleSheets } from './services/googleSheets';
 
@@ -55,7 +56,7 @@ app.post('/admin/reload', async (req: any, res: any) => {
 app.use('/ids', idsRouter);
 app.use('/campaigns', campaignsRouter);
 app.use('/tracking', trackingRouter);
-app.use('/analytics', trackingRouter);
+app.use('/analytics', analyticsRouter);
 app.use('/r', trackingRouter);
 
 // Serve index.html for any other routes (SPA support)
