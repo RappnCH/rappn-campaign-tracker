@@ -1,71 +1,120 @@
-# Rappn Campaign Tracker - Phase 1
+# Rappn Campaign Tracker
 
-Core tracking infrastructure for Rappn Marketing Campaign Manager with **Google Sheets** integration for real-time click tracking!
+Piattaforma full‑stack per gestire l'intero ciclo di vita delle campagne Rappn: creazione, distribuzione, click tracking in tempo reale e analisi avanzata tramite **Google Sheets**.
 
-## Features
+## Panoramica
 
-- **ID & Naming Service**: Generate campaign IDs following the pattern `YYYY-MM_GEO-CHANNEL-TYPE-CONCEPT-LANG`
-- **Campaign Service**: CRUD operations for campaigns
-- **Tracking Service**: Generate UTM parameters and QR IDs for placement tracking
-- **📊 Google Sheets Database**: Real-time click tracking saved to Google Sheets (FREE!)
-- **Click Analytics**: Track every click with UTM parameters, IP, user agent, and referrer
-- **QR Code Generation**: Branded QR codes for offline campaigns
+- **Frontend**: Single-page app in vanilla JS + Tailwind (`public/app.js`). Include dashboard performance con Chart.js, filtri attivo/inattivo, archivio campagne e flussi di riattivazione.
+- **Backend**: API Express/TypeScript (`src/services/*`) con orchestrazione tra campagne, tracciamenti e sincronizzazione Google Sheets.
+- **Data Layer**: Foglio Google con tre tabelle (`Campaigns`, `Placements`, `Clicks`) che funge da database a costo zero e supporta aggiornamenti in tempo reale.
 
-## Quick Start with Google Sheets
+## Stack Tecnologico
 
-**Want real-time tracking in Google Sheets?** See `QUICK_START.md` for 5-minute setup!
+| Area | Tecnologie |
+| --- | --- |
+| Frontend | Tailwind CSS, Chart.js 4, vanilla JS |
+| Backend | Node.js, Express, TypeScript |
+| Data | Google Sheets API v4 |
+| Deploy | Railway (build + autodeploy da `main`) |
 
-The app works immediately with in-memory storage, but for persistent tracking:
-1. Create a Google Service Account (FREE)
-2. Create a Google Sheet
-3. Share it with the service account
-4. Add credentials to `.env`
+## Architettura
 
-**Detailed guide:** See `GOOGLE_SHEETS_SETUP.md`
+1. **Campaign Service** (`src/services/campaigns.ts`)
+	- CRUD, soft delete (imposta `inactive`), toggle stato e riattivazione con nuove date.
+2. **Tracking Service** (`src/services/tracking.ts`)
+	- Costruzione URL con UTM + QR ID, generazione QR code brandizzato.
+3. **Analytics Service** (`src/services/analytics.ts`)
+	- Aggregazioni per dashboard: click totali, canali, timeline giorno/settimana/mese, per-campagna, per-ora.
+4. **Google Sheets Adapter** (`src/services/googleSheets.ts`)
+	- Wrapper autenticato per leggere/scrivere nelle tre schede e garantire consistenza.
 
-## Setup
+### Schema Google Sheets
 
-1. Install dependencies:
-```bash
-npm install
-```
+Foglio ufficiale Rappn: [Rappn Campaign Tracker Sheet](https://docs.google.com/spreadsheets/d/1Udw-HYVgSUXconkd30_WycN-CtlqXIVPOCeDjsWICmE/edit?usp=sharing)
 
-2. Configure environment:
-```bash
-cp .env.example .env
-# Optional: Add Google Sheets credentials for persistent tracking
-```
+| Sheet | Colonne principali | Uso |
+| --- | --- | --- |
+| `Campaigns` | `campaign_id`, `name`, `status`, `start_date`, `end_date`, `budget` | Sorgente verità per stato e metadati campagne |
+| `Placements` | `placement_id`, `campaign_id`, `channel`, `utm_*`, `qr_id` | Inventario di tutti i touchpoint tracciati |
+| `Clicks` | `click_id`, `timestamp`, `campaign_id`, `placement_id`, `channel`, `ip`, `ua`, `referrer` | Log grezzo dei click per analytics |
 
-3. Start development server:
-```bash
-npm run dev
-```
+## Setup Locale
 
-4. Open browser:
-```
-http://localhost:3000
-```
+1. **Installazione**
+	```bash
+	npm install
+	```
+2. **Configurazione env**
+	```bash
+	cp .env.example .env
+	# Compila: PORT, API keys, GOOGLE_SHEET_ID, GOOGLE_SERVICE_KEY
+	```
+3. **Avvio**
+	```bash
+	npm run dev   # backend + static server su http://localhost:3000
+	```
 
-## How It Works
+## Script NPM
 
-- **In-Memory Mode** (default): Works immediately, data resets on restart
-- **Google Sheets Mode** (recommended): All clicks, campaigns, and placements saved to Google Sheets in real-time
+| Comando | Descrizione |
+| --- | --- |
+| `npm run dev` | Nodemon + build watch |
+| `npm run build` | Compila TypeScript |
+| `npm start` | Avvia server in produzione |
 
-## API Endpoints
+## Flusso Operativo Campagne
 
-### ID & Naming Service
-- `POST /ids/campaign` - Generate campaign ID
+1. **Creazione** – Wizard in tre step (info generali, budgeting, targeting) genera ID `YYYY-MM_GEO-CHANNEL-TYPE-CONCEPT-LANG` e salva in Sheets.
+2. **Placements & Tracking** – Ogni placement riceve link con UTM e QR code per canali offline/online.
+3. **Distribuzione** – Si condividono link/QR; ogni click viene registrato via endpoint `/tracking/click` direttamente nella scheda `Clicks`.
+4. **Performance Dashboard**
+	- Filtri rapido: `Active`, `Inactive`, `All` (sincronizzati lato API).
+	- Timeline `Daily / Weekly / Monthly` (aggregation lato backend) + grafici canale/campagna/ora.
+5. **Gestione Stato**
+	- Toggle `Activate/Deactivate` inline.
+	- `Delete` esegue soft delete (status `inactive`).
+	- Pagina `Archive` mostra tutte le campagne inattive con bottone `Reactivate` (richiede nuove date).
+6. **Reactivation Flow** – Patch `/campaigns/:id/reactivate` aggiorna sheet, resetta periodo e rimette la campagna nella dashboard attiva.
 
-### Campaign Service
-- `POST /campaigns` - Create campaign
-- `GET /campaigns` - List all campaigns
-- `GET /campaigns/:id` - Get campaign by ID
-- `PUT /campaigns/:id` - Update campaign
-- `DELETE /campaigns/:id` - Delete campaign
+## Endpoint Principali
 
-### Tracking Service
-- `POST /tracking/build-placement-link` - Generate tracking URL with UTMs and QR ID
+- `GET /campaigns` – Lista campagne con stato.
+- `PATCH /campaigns/:id/status` – Toggle attivo/inattivo.
+- `PATCH /campaigns/:id/reactivate` – Reimposta date attive.
+- `GET /analytics/overview?status=active&timeframe=weekly` – Dataset per dashboard globale.
+- `GET /analytics/campaign/:id?timeframe=monthly` – Insight granulari per singola campagna.
+- `POST /tracking/build-placement-link` – Genera URL + QR.
 
-## Database Schema
+## Frontend Insights
 
-See `src/db/schema.sql` for the complete database schema.
+- Stato globale gestito in `public/app.js` con render ottimizzati.
+- Chart.js configurato con palette brand Rappn (`#3aaa35`, `#18a19a`).
+- Componenti principali: `renderPerformance`, `renderArchive`, `renderReactivateModal`.
+- Funzione `setClicksTimeframe` sincronizza UI + chiamate API.
+
+## Deployment
+
+- Branch `main` → Railway: build `npm run build` + `npm start`.
+- Variabili d'ambiente (Railway): tutte quelle di `.env` + credenziali Service Account (JSON base64).
+
+## Come Usarlo per le Campagne
+
+1. **Apri dashboard**: `https://rappn-campaign-tracker-production.up.railway.app`.
+2. **Crea nuova campagna** dal wizard (serve budget, geo, lingua, date).
+3. **Aggiungi placements** specificando canale, formato e obiettivo; copia i link tracciati.
+4. **Distribuisci** i link/QR nei canali scelti.
+5. **Monitora** dal tab Performance: seleziona filtro stato + timeframe adeguato alla finestra di reporting (es. weekly per retrospettive brevi, monthly per management report).
+6. **Gestisci ciclo di vita**: 
+	- Metti in pausa con `Deactivate` se la creatività è sospesa.
+	- Sposta in archivio con `Delete` (soft).
+	- Riattiva direttamente dall'Archivio impostando nuove date.
+
+## FAQ
+
+- **Perché Google Sheets?** Riduce costi infra, permette audit immediato e export manuale.
+- **Posso usare solo campagne attive?** Sì, il filtro `Active` limita sia UI che query backend.
+- **Come aggiungo nuovi campi?** Estendi la scheda Google, aggiorna mapping in `googleSheets.ts`, poi adegua DTO lato frontend.
+
+---
+
+Per qualsiasi dubbio apri una issue su GitHub o contatta il team Growth.
