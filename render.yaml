@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: rappn-campaign-tracker
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: GOOGLE_SHEET_ID
+        sync: false
+      - key: GOOGLE_CREDENTIALS
+        sync: false
+      - key: TRACKING_BASE_URL
+        sync: false

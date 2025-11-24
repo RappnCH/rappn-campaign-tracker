@@ -1,0 +1,160 @@
+### Test: Generate Campaign ID
+POST http://localhost:3000/ids/campaign
+Content-Type: application/json
+
+{
+  "dateStart": "2025-10-15",
+  "geo": "ZH",
+  "primaryChannel": "FB",
+  "type": "PAID",
+  "concept": "Cheapest Basket",
+  "language": "DE"
+}
+
+###
+
+### Test: Generate Campaign ID (Multi-channel)
+POST http://localhost:3000/ids/campaign
+Content-Type: application/json
+
+{
+  "dateStart": "2025-11-01",
+  "geo": "GE",
+  "type": "ORGANIC",
+  "concept": "Mixed Route",
+  "language": "FR"
+}
+
+###
+
+### Test: Create Campaign
+POST http://localhost:3000/campaigns
+Content-Type: application/json
+
+{
+  "campaign_id": "2025-12_BS-IG-PAID-FLASH-SALE-DE",
+  "name": "Basel — Flash Sale (DE)",
+  "date_start": "2025-12-01",
+  "date_end": "2025-12-15",
+  "geo": "BS",
+  "primary_channel": "IG",
+  "type": "PAID",
+  "concept": "Flash Sale",
+  "language": "DE",
+  "status": "draft",
+  "budget": 3000.00,
+  "description": "Instagram campaign for Basel flash sale"
+}
+
+###
+
+### Test: List All Campaigns
+GET http://localhost:3000/campaigns
+
+###
+
+### Test: Get Specific Campaign
+GET http://localhost:3000/campaigns/2025-10_ZH-FB-PAID-BASKET-DE
+
+###
+
+### Test: Update Campaign
+PUT http://localhost:3000/campaigns/2025-10_ZH-FB-PAID-BASKET-DE
+Content-Type: application/json
+
+{
+  "status": "active",
+  "budget": 6000.00
+}
+
+###
+
+### Test: Build Placement Link (Facebook Feed)
+POST http://localhost:3000/tracking/build-placement-link
+Content-Type: application/json
+
+{
+  "campaign_id": "2025-10_ZH-FB-PAID-BASKET-DE",
+  "placement_id_seq": 1,
+  "channel": "facebook",
+  "ad_type": "FEED",
+  "base_url": "https://rappn.ch",
+  "medium": "paid",
+  "geo": "ZH",
+  "language": "DE",
+  "concept": "Cheapest Basket"
+}
+
+###
+
+### Test: Build Placement Link (Instagram Story)
+POST http://localhost:3000/tracking/build-placement-link
+Content-Type: application/json
+
+{
+  "campaign_id": "2025-10_ZH-FB-PAID-BASKET-DE",
+  "placement_id_seq": 2,
+  "channel": "instagram",
+  "ad_type": "STORY",
+  "base_url": "https://rappn.ch",
+  "medium": "paid",
+  "geo": "ZH",
+  "language": "DE",
+  "concept": "Cheapest Basket"
+}
+
+###
+
+### Test: Build Placement Link (QR Code on Flyer)
+POST http://localhost:3000/tracking/build-placement-link
+Content-Type: application/json
+
+{
+  "campaign_id": "2025-11_GE-MULTI-ORGANIC-MIXED-ROUTE-FR",
+  "placement_id_seq": 1,
+  "channel": "flyer",
+  "ad_type": "PRINT",
+  "base_url": "https://rappn.ch",
+  "medium": "qr",
+  "geo": "GE",
+  "language": "FR",
+  "concept": "Mixed Route"
+}
+
+###
+
+### Test: Build Placement Link (QR Code on Poster)
+POST http://localhost:3000/tracking/build-placement-link
+Content-Type: application/json
+
+{
+  "campaign_id": "2025-11_GE-MULTI-ORGANIC-MIXED-ROUTE-FR",
+  "placement_id_seq": 2,
+  "channel": "poster",
+  "ad_type": "OUTDOOR",
+  "base_url": "https://rappn.ch",
+  "medium": "qr",
+  "geo": "GE",
+  "language": "FR",
+  "concept": "Mixed Route"
+}
+
+###
+
+### Test: Get Campaign Placements
+GET http://localhost:3000/tracking/placements/2025-10_ZH-FB-PAID-BASKET-DE
+
+###
+
+### Test: Get Campaign Placements (Geneva)
+GET http://localhost:3000/tracking/placements/2025-11_GE-MULTI-ORGANIC-MIXED-ROUTE-FR
+
+###
+
+### Test: Delete Campaign
+DELETE http://localhost:3000/campaigns/2025-12_BS-IG-PAID-FLASH-SALE-DE
+
+###
+
+### Test: Health Check
+GET http://localhost:3000/health
