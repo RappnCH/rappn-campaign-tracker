@@ -41,6 +41,16 @@ app.get('/health', (req: any, res: any) => {
   });
 });
 
+// Reload data from Google Sheets
+app.post('/admin/reload', async (req: any, res: any) => {
+  try {
+    await memoryDb.initializeFromSheets();
+    res.json({ success: true, message: 'Data reloaded from Google Sheets' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to reload data' });
+  }
+});
+
 // API Routes
 app.use('/ids', idsRouter);
 app.use('/campaigns', campaignsRouter);
