@@ -1,5 +1,7 @@
 # Rappn Campaign Tracker
 
+https://rappn-campaign-tracker-production.up.railway.app/r/b55315
+
 Piattaforma full‑stack per gestire l'intero ciclo di vita delle campagne Rappn: creazione, distribuzione, click tracking in tempo reale e analisi avanzata tramite **Google Sheets**.
 
 ## Panoramica
