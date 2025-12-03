@@ -5,6 +5,7 @@
  * Place it right before the closing </body> tag
  * 
  * This will automatically track ALL visits (Organic, Direct, and Paid)
+ * Updated: 2025-12-03
  */
 
 (function() {
