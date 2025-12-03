@@ -312,9 +312,52 @@ router.post('/page-view', async (req: Request, res: Response) => {
       sanitizedIp = sanitizedIp.replace(/[^0-9a-fA-F:.]/g, '');
     }
 
+    // Determine campaign/source/medium if missing
+    let finalCampaignId = campaign_id || utm_campaign;
+    let finalChannel = utm_source;
+    let finalMedium = utm_medium;
+
+    // If no UTMs, try to infer from referrer
+    if (!finalCampaignId && !finalChannel) {
+      if (referrer) {
+        try {
+          const refUrl = new URL(referrer);
+          const hostname = refUrl.hostname.toLowerCase();
+          
+          if (hostname.includes('google') || hostname.includes('bing') || hostname.includes('yahoo') || hostname.includes('duckduckgo')) {
+            finalCampaignId = 'organic-search';
+            finalChannel = 'search_engine';
+            finalMedium = 'organic';
+          } else if (hostname.includes('facebook') || hostname.includes('instagram') || hostname.includes('linkedin') || hostname.includes('twitter') || hostname.includes('t.co')) {
+            finalCampaignId = 'social-organic';
+            finalChannel = 'social';
+            finalMedium = 'organic';
+          } else if (hostname.includes(new URL(page_url).hostname)) {
+             // Internal traffic
+             finalCampaignId = 'internal';
+             finalChannel = 'internal';
+             finalMedium = 'referral';
+          } else {
+            finalCampaignId = 'referral';
+            finalChannel = 'referral';
+            finalMedium = 'referral';
+          }
+        } catch (e) {
+          // Invalid referrer URL
+          finalCampaignId = 'direct-traffic';
+          finalChannel = 'direct';
+          finalMedium = 'none';
+        }
+      } else {
+        // Direct traffic (no referrer)
+        finalCampaignId = 'direct-traffic';
+        finalChannel = 'direct';
+        finalMedium = 'none';
+      }
+    }
+
     // Find the matching placement based on UTM parameters
     let placement_id = 0;
-    let campaign_id = '';
     
     // Try to find placement by matching UTM content
     if (utm_content) {
@@ -334,19 +377,19 @@ router.post('/page-view', async (req: Request, res: Response) => {
       
       if (matchedPlacement) {
         placement_id = matchedPlacement.id;
-        campaign_id = matchedPlacement.campaign_id;
-        console.log(`✅ Matched to Placement ID: ${placement_id}, Campaign: ${campaign_id}`);
+        finalCampaignId = matchedPlacement.campaign_id; // Use the real campaign ID if matched
+        console.log(`✅ Matched to Placement ID: ${placement_id}, Campaign: ${finalCampaignId}`);
       }
     }
 
     // Save to Google Sheets
     await saveClickToSheets({
       click_id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      campaign_id: campaign_id || utm_campaign || 'unknown',
+      campaign_id: finalCampaignId || 'unknown',
       placement_id: placement_id || 0,
-      channel: utm_source || 'direct',
+      channel: finalChannel || 'direct',
       ad_type: 'page-view',
-      medium: utm_medium || 'unknown',
+      medium: finalMedium || 'unknown',
       utm_source: utm_source || '',
       utm_campaign: utm_campaign || '',
       utm_medium: utm_medium || '',

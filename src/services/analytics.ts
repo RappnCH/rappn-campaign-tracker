@@ -176,14 +176,27 @@ router.get('/overview', async (req: Request, res: Response) => {
     };
     
     activeClicks.forEach((click: any) => {
-      // Check utm_campaign (index 8) or ad_type (index 5)
+      // Check utm_campaign (index 8), ad_type (index 5), and utm_medium (index 9)
       const utmCampaign = (click[8] || '').toLowerCase();
       const adType = (click[5] || '').toLowerCase();
+      const utmMedium = (click[9] || '').toLowerCase();
       
-      if (utmCampaign === 'organic' || adType === 'organic') {
-        clicksByType.organic++;
-      } else {
+      // Paid indicators
+      const isPaid = 
+        utmMedium === 'cpc' || 
+        utmMedium === 'ppc' || 
+        utmMedium === 'paid' || 
+        utmMedium === 'display' || 
+        utmMedium === 'social-paid' ||
+        adType === 'paid' ||
+        adType === 'banner' ||
+        adType === 'video-ad';
+
+      if (isPaid) {
         clicksByType.paid++;
+      } else {
+        // Everything else is considered organic/direct
+        clicksByType.organic++;
       }
     });
 
