@@ -313,7 +313,7 @@ router.post('/page-view', async (req: Request, res: Response) => {
     }
 
     // Determine campaign/source/medium if missing
-    let finalCampaignId = campaign_id || utm_campaign;
+    let finalCampaignId = utm_campaign;
     let finalChannel = utm_source;
     let finalMedium = utm_medium;
 
