@@ -64,7 +64,11 @@ export async function setupGoogleSheets() {
       'Final URL',
       'IP Address',
       'User Agent',
-      'Referrer'
+      'Referrer',
+      'Country',
+      'Region',
+      'City',
+      'ISP'
     ];
 
     // Create headers for Campaigns sheet
@@ -191,6 +195,10 @@ export async function saveClickToSheets(clickData: {
   ip_address?: string;
   user_agent?: string;
   referrer?: string;
+  country?: string;
+  region?: string;
+  city?: string;
+  isp?: string;
 }) {
   const api = await initializeSheets();
   if (!api) return false;
@@ -212,12 +220,16 @@ export async function saveClickToSheets(clickData: {
       clickData.final_url,
       clickData.ip_address || '',
       clickData.user_agent || '',
-      clickData.referrer || ''
+      clickData.referrer || '',
+      clickData.country || '',
+      clickData.region || '',
+      clickData.city || '',
+      clickData.isp || ''
     ];
 
     await api.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${CLICKS_SHEET_NAME}!A:O`,
+      range: `${CLICKS_SHEET_NAME}!A:S`,
       valueInputOption: 'RAW',
       requestBody: {
         values: [row]
@@ -348,7 +360,11 @@ export async function getClicksFromSheets(campaignId?: string) {
       final_url: row[11],
       ip_address: row[12],
       user_agent: row[13],
-      referrer: row[14]
+      referrer: row[14],
+      country: row[15],
+      region: row[16],
+      city: row[17],
+      isp: row[18]
     }));
 
     if (campaignId) {

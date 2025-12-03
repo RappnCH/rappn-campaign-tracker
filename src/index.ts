@@ -16,9 +16,15 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors({
-  origin: '*', // Allow all origins for tracking (restrict in production)
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  origin: [
+    'https://rappn-landing-page.vercel.app',
+    'https://rappn.ch',
+    'http://localhost:3000', // Keep localhost for development
+    'http://localhost:5173'  // Vite default port
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

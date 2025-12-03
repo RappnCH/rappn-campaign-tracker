@@ -169,6 +169,32 @@ router.get('/overview', async (req: Request, res: Response) => {
       }
     });
 
+    // Calculate Organic vs Paid split
+    const clicksByType = {
+      organic: 0,
+      paid: 0
+    };
+    
+    activeClicks.forEach((click: any) => {
+      // Check utm_campaign (index 8) or ad_type (index 5)
+      const utmCampaign = (click[8] || '').toLowerCase();
+      const adType = (click[5] || '').toLowerCase();
+      
+      if (utmCampaign === 'organic' || adType === 'organic') {
+        clicksByType.organic++;
+      } else {
+        clicksByType.paid++;
+      }
+    });
+
+    // Calculate clicks by country
+    const clicksByCountry: { [key: string]: number } = {};
+    activeClicks.forEach((click: any) => {
+      // Country is at index 15 (based on new headers)
+      const country = click[15] || 'Unknown';
+      clicksByCountry[country] = (clicksByCountry[country] || 0) + 1;
+    });
+
     res.json({
       summary: {
         total_clicks: totalClicks,
@@ -187,6 +213,10 @@ router.get('/overview', async (req: Request, res: Response) => {
         hour,
         clicks: clicksByHour[hour] || 0,
       })),
+      clicks_by_type: clicksByType,
+      clicks_by_country: Object.entries(clicksByCountry)
+        .map(([country, clicks]) => ({ country, clicks }))
+        .sort((a, b) => b.clicks - a.clicks),
     });
   } catch (error) {
     console.error('Error fetching overview analytics:', error);

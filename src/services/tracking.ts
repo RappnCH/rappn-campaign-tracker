@@ -281,16 +281,36 @@ router.get('/analytics/placement/:placement_id', async (req: Request, res: Respo
  */
 router.post('/page-view', async (req: Request, res: Response) => {
   try {
-    const { utm_source, utm_medium, utm_campaign, utm_content, qr, page_url, referrer } = req.body;
+    const { 
+      utm_source, 
+      utm_medium, 
+      utm_campaign, 
+      utm_content, 
+      qr, 
+      page_url, 
+      referrer,
+      ip_address,
+      country,
+      region,
+      city,
+      isp
+    } = req.body;
     
     console.log(`\n📊 ====== PAGE VIEW TRACKED ======`);
     console.log(`Page URL: ${page_url}`);
     console.log(`UTM Source: ${utm_source}`);
     console.log(`UTM Campaign: ${utm_campaign}`);
     console.log(`QR Code: ${qr}`);
+    console.log(`Location: ${city}, ${region}, ${country}`);
     
     const user_agent = req.headers['user-agent'];
-    const ip = req.ip;
+    
+    // Sanitize IP address (basic sanitization)
+    let sanitizedIp = ip_address || req.ip;
+    if (sanitizedIp && typeof sanitizedIp === 'string') {
+      // Remove any non-standard characters, keep only valid IP chars
+      sanitizedIp = sanitizedIp.replace(/[^0-9a-fA-F:.]/g, '');
+    }
 
     // Find the matching placement based on UTM parameters
     let placement_id = 0;
@@ -332,9 +352,13 @@ router.post('/page-view', async (req: Request, res: Response) => {
       utm_medium: utm_medium || '',
       utm_content: utm_content || '',
       final_url: page_url || '',
-      ip_address: ip,
+      ip_address: sanitizedIp,
       user_agent,
       referrer,
+      country,
+      region,
+      city,
+      isp
     });
     
     console.log(`✅ Page view saved to Google Sheets`);

@@ -861,6 +861,25 @@ function renderPerformance() {
                             </div>
                         </div>
                     </div>
+
+                    <!-- Charts Row 3 -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                        <!-- Organic vs Paid -->
+                        <div class="bg-white rounded-2xl shadow-md p-6">
+                            <h3 class="text-xl font-bold mb-4">Organic vs Paid</h3>
+                            <div style="height: 300px; position: relative;">
+                                <canvas id="organicVsPaidChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Clicks by Country -->
+                        <div class="bg-white rounded-2xl shadow-md p-6">
+                            <h3 class="text-xl font-bold mb-4">Clicks by Country</h3>
+                            <div style="height: 300px; position: relative;">
+                                <canvas id="clicksByCountryChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
                 `}
             </div>
         `;
@@ -1338,6 +1357,95 @@ function renderOverviewCharts() {
                 }
             });
         }
+    }
+
+    // Organic vs Paid
+    const organicVsPaidCanvas = document.getElementById('organicVsPaidChart');
+    if (organicVsPaidCanvas && overviewAnalytics.clicks_by_type) {
+        const data = overviewAnalytics.clicks_by_type;
+        charts.organicVsPaid = new Chart(organicVsPaidCanvas, {
+            type: 'doughnut',
+            data: {
+                labels: ['Organic', 'Paid'],
+                datasets: [{
+                    data: [data.organic, data.paid],
+                    backgroundColor: ['#3aaa35', '#18a19a'],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { 
+                        position: 'bottom',
+                        labels: {
+                            padding: 15,
+                            font: { size: 12 },
+                            usePointStyle: true
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        callbacks: {
+                            label: function(context) {
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : 0;
+                                return `${context.label}: ${context.parsed} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Clicks by Country
+    const clicksByCountryCanvas = document.getElementById('clicksByCountryChart');
+    if (clicksByCountryCanvas && overviewAnalytics.clicks_by_country) {
+        const countries = overviewAnalytics.clicks_by_country.map(c => c.country);
+        const clicks = overviewAnalytics.clicks_by_country.map(c => c.clicks);
+        
+        charts.clicksByCountry = new Chart(clicksByCountryCanvas, {
+            type: 'bar',
+            data: {
+                labels: countries,
+                datasets: [{
+                    label: 'Clicks',
+                    data: clicks,
+                    backgroundColor: '#3aaa35',
+                    borderRadius: 6,
+                    borderSkipped: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12
+                    }
+                },
+                scales: {
+                    x: { 
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        }
+                    },
+                    y: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
     }
 }
 
