@@ -15,6 +15,12 @@ let campaignFilter = 'active'; // 'active', 'inactive', or 'all'
 let reactivatingCampaign = null; // For the reactivation modal
 let clicksTimeframe = 'daily'; // 'daily', 'weekly', or 'monthly'
 
+let cockpitTimeRange = '30d'; // Default time range
+let cockpitDevMode = false; // Toggle for showing endpoints
+let cockpitModal = null; // Current open modal
+let cockpitCanton = 'all'; // Default canton filter
+let growthGranularity = 'daily'; // 'daily', 'weekly', 'monthly'
+
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', async function() {
     console.log('DOM loaded');
@@ -41,7 +47,7 @@ function renderApp() {
         <header class="gradient-bg text-white shadow-lg">
             <div class="container mx-auto px-6 py-4 flex justify-between items-center">
                 <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-rappn-green font-bold text-xl">R</div>
+                    <img src="/logo.svg" alt="Rappn Logo" class="h-12 w-auto bg-white rounded-lg p-1">
                     <h1 class="text-2xl font-bold">Rappn Campaign Manager</h1>
                 </div>
                 <button onclick="showNewCampaignWizard()" class="bg-white text-rappn-green px-6 py-2 rounded-lg font-semibold hover:bg-opacity-90 transition">
@@ -55,6 +61,10 @@ function renderApp() {
             <!-- Sidebar -->
             <aside class="w-64 bg-white shadow-lg">
                 <nav class="p-4">
+                    <button onclick="switchView('ceo-cockpit')" class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 ${currentView === 'ceo-cockpit' ? 'bg-gradient-to-r from-rappn-green to-rappn-blue text-white' : 'text-gray-700 hover:bg-gray-100'}">
+                        <span>🚀</span>
+                        <span class="font-medium">CEO Cockpit</span>
+                    </button>
                     <button onclick="switchView('dashboard')" class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg mb-2 ${currentView === 'dashboard' ? 'bg-gradient-to-r from-rappn-green to-rappn-blue text-white' : 'text-gray-700 hover:bg-gray-100'}">
                         <span>📊</span>
                         <span class="font-medium">Campaigns</span>
@@ -84,6 +94,13 @@ function renderApp() {
             </main>
         </div>
     `;
+
+    // Render Charts if Modal is Open
+    if (cockpitModal) {
+        setTimeout(() => {
+            renderCockpitModalCharts();
+        }, 100);
+    }
     
     // Generate QR codes after DOM is updated
     if (currentView === 'campaign-detail' && placements.length > 0) {
@@ -94,16 +111,19 @@ function renderApp() {
     }
     
     // Render charts after DOM is updated
-    if (currentView === 'performance') {
+    if (currentView === 'performance' || currentView === 'ceo-cockpit') {
         setTimeout(() => {
             console.log('Attempting to render charts...');
-            renderCharts();
+            if (currentView === 'performance') renderCharts();
+            if (currentView === 'ceo-cockpit') renderCEOCockpitCharts();
         }, 200);
     }
 }
 
 function renderCurrentView() {
     switch(currentView) {
+        case 'ceo-cockpit':
+            return renderCEOCockpit();
         case 'dashboard':
             return renderDashboard();
         case 'campaign-detail':
@@ -121,6 +141,1054 @@ function renderCurrentView() {
         default:
             return renderDashboard();
     }
+}
+
+function renderCEOCockpit() {
+    // Fake Data Initialization
+    const growthData = {
+        downloads: 12450,
+        wau: 2150,
+        retention: 14.2,
+        liveUsers: 345
+    };
+
+    const viralData = {
+        listsShared: 850,
+        listsAccepted: 480,
+        conversionRate: 56.4
+    };
+
+    const engagementData = {
+        genericAdded: 15000,
+        offersAdded: 12500,
+        offersFavorited: 3200
+    };
+
+    const inStoreData = {
+        itemsSlidedBought: 45000,
+        itemsSlidedToBuy: 18200,
+        cartsCreated: 6850,
+        userSavings: 84200
+    };
+
+    const geoData = {
+        totalUsers: 9850,
+        breakdown: [
+            { code: 'ZH', name: 'Zurich', users: 4500, growth: 12.5 },
+            { code: 'VD', name: 'Vaud', users: 2100, growth: 8.2 },
+            { code: 'BE', name: 'Bern', users: 1800, growth: -1.5 },
+            { code: 'GE', name: 'Geneva', users: 1200, growth: 22.0 },
+            { code: 'TI', name: 'Ticino', users: 450, growth: 5.4 }
+        ]
+    };
+
+    // Helper for Dev Tooltip
+    const renderDevTooltip = (method, path, paramsObj = {}) => {
+        // Merge default params with passed params
+        const finalParams = { 
+            time_range: cockpitTimeRange,
+            ...paramsObj 
+        };
+        
+        // Only add canton if it's not 'all'
+        if (cockpitCanton !== 'all') {
+            finalParams.canton = cockpitCanton;
+        }
+
+        // Format params string
+        const paramsString = Object.entries(finalParams)
+            .map(([k, v]) => `${k}: '${v}'`)
+            .join(', ');
+
+        return `
+        <div class="hidden group-hover:block absolute z-50 bottom-full left-0 mb-2 w-64 p-3 bg-gray-900 text-white text-xs rounded shadow-xl pointer-events-none">
+            <div class="font-mono font-bold text-green-400">${method}</div>
+            <div class="font-mono break-all">${path}</div>
+            <div class="font-mono text-gray-400 mt-1">params: { ${paramsString} }</div>
+            <div class="absolute bottom-0 left-4 transform translate-y-1/2 rotate-45 w-2 h-2 bg-gray-900"></div>
+        </div>
+    `};
+
+    // Helper for Drill-down Icon
+    const drillDownIcon = `
+        <div class="absolute top-4 right-4 text-gray-300 group-hover:text-blue-500 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+            </svg>
+        </div>
+    `;
+
+    return `
+        <div class="p-6 space-y-6 relative">
+            <!-- Header & Controls -->
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h2 class="text-3xl font-bold text-gray-900">CEO Cockpit</h2>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded">Live Data Simulation</span>
+                        <label class="inline-flex items-center cursor-pointer">
+                            <input type="checkbox" class="sr-only peer" onchange="toggleCockpitDevMode()" ${cockpitDevMode ? 'checked' : ''}>
+                            <div class="relative w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                            <span class="ms-2 text-xs font-medium text-gray-500">Dev Mode</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-4">
+                    <!-- Canton Filter -->
+                    <div class="flex items-center bg-white rounded-lg shadow-sm border border-gray-200 p-1">
+                        <span class="px-3 text-sm text-gray-500 font-medium">Region:</span>
+                        <select onchange="setCockpitCanton(this.value)" class="bg-transparent border-none text-sm font-bold text-gray-900 focus:ring-0 cursor-pointer outline-none">
+                            <option value="all" ${cockpitCanton === 'all' ? 'selected' : ''}>All Switzerland</option>
+                            <option value="ZH" ${cockpitCanton === 'ZH' ? 'selected' : ''}>Zurich (ZH)</option>
+                            <option value="BE" ${cockpitCanton === 'BE' ? 'selected' : ''}>Bern (BE)</option>
+                            <option value="VD" ${cockpitCanton === 'VD' ? 'selected' : ''}>Vaud (VD)</option>
+                            <option value="GE" ${cockpitCanton === 'GE' ? 'selected' : ''}>Geneva (GE)</option>
+                            <option value="TI" ${cockpitCanton === 'TI' ? 'selected' : ''}>Ticino (TI)</option>
+                        </select>
+                    </div>
+
+                    <!-- Time Range Filter -->
+                    <div class="flex items-center bg-white rounded-lg shadow-sm border border-gray-200 p-1">
+                        <span class="px-3 text-sm text-gray-500 font-medium">Time:</span>
+                        <select onchange="setCockpitTimeRange(this.value)" class="bg-transparent border-none text-sm font-bold text-gray-900 focus:ring-0 cursor-pointer outline-none">
+                            <option value="today" ${cockpitTimeRange === 'today' ? 'selected' : ''}>Today</option>
+                            <option value="7d" ${cockpitTimeRange === '7d' ? 'selected' : ''}>Last 7 Days</option>
+                            <option value="30d" ${cockpitTimeRange === '30d' ? 'selected' : ''}>Last 30 Days</option>
+                            <option value="ytd" ${cockpitTimeRange === 'ytd' ? 'selected' : ''}>Year-to-Date</option>
+                            <option value="all" ${cockpitTimeRange === 'all' ? 'selected' : ''}>All Time</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 1: Growth Pulse (Top Row) -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <!-- KPI 1: Total Downloads -->
+                <div onclick="openCockpitModal('growth')" class="bg-white rounded-2xl shadow-md p-6 relative overflow-visible group cursor-pointer hover:shadow-lg transition-all transform hover:-translate-y-1">
+                    ${drillDownIcon}
+                    <div class="relative group w-max">
+                        <div class="text-gray-500 text-sm font-medium uppercase tracking-wide border-b border-dotted border-gray-400">Total Downloads</div>
+                        ${renderDevTooltip('GET', '/api/v1/dashboard/growth')}
+                    </div>
+                    <div class="mt-2 flex items-baseline">
+                        <span class="text-4xl font-extrabold text-gray-900">${growthData.downloads.toLocaleString()}</span>
+                        <span class="ml-2 text-sm font-medium text-green-600">↑ 12%</span>
+                    </div>
+                    <div class="mt-4">
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-gray-500">Target: 50k (Sept 2026)</span>
+                            <span class="font-medium text-gray-700">25%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-1.5">
+                            <div class="bg-blue-600 h-1.5 rounded-full" style="width: 25%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- KPI 2: WAU -->
+                <div onclick="openCockpitModal('growth')" class="bg-white rounded-2xl shadow-md p-6 relative overflow-visible group cursor-pointer hover:shadow-lg transition-all transform hover:-translate-y-1">
+                    ${drillDownIcon}
+                    <div class="relative group w-max">
+                        <div class="text-gray-500 text-sm font-medium uppercase tracking-wide border-b border-dotted border-gray-400">Weekly Active Users</div>
+                        ${renderDevTooltip('GET', '/api/v1/dashboard/growth')}
+                    </div>
+                    <div class="mt-2 flex items-baseline">
+                        <span class="text-4xl font-extrabold text-gray-900">${growthData.wau.toLocaleString()}</span>
+                        <span class="ml-2 text-sm font-medium text-green-600">↑ 5%</span>
+                    </div>
+                </div>
+
+                <!-- KPI 3: Retention -->
+                <div onclick="openCockpitModal('retention')" class="bg-white rounded-2xl shadow-md p-6 relative overflow-visible group cursor-pointer hover:shadow-lg transition-all transform hover:-translate-y-1">
+                    ${drillDownIcon}
+                    <div class="relative group w-max">
+                        <div class="text-gray-500 text-sm font-medium uppercase tracking-wide border-b border-dotted border-gray-400">Day-30 Retention</div>
+                        ${renderDevTooltip('GET', '/api/v1/dashboard/retention')}
+                    </div>
+                    <div class="mt-2 flex items-baseline">
+                        <span class="text-4xl font-extrabold text-green-600">${growthData.retention}%</span>
+                    </div>
+                    <div class="mt-1 text-xs text-gray-500">vs Industry Avg 6%</div>
+                </div>
+
+                <!-- KPI 4: Live Users -->
+                <div onclick="openCockpitModal('growth')" class="bg-white rounded-2xl shadow-md p-6 relative overflow-visible group cursor-pointer hover:shadow-lg transition-all transform hover:-translate-y-1 border-l-4 border-green-500">
+                    ${drillDownIcon}
+                    <div class="flex justify-between items-start">
+                        <div class="relative group w-max">
+                            <div class="text-gray-500 text-sm font-medium uppercase tracking-wide border-b border-dotted border-gray-400">Live Users Now</div>
+                            ${renderDevTooltip('GET', '/api/v1/dashboard/growth')}
+                        </div>
+                        <span class="flex h-3 w-3 relative">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                        </span>
+                    </div>
+                    <div class="mt-2 flex items-baseline">
+                        <span class="text-4xl font-extrabold text-gray-900">${growthData.liveUsers}</span>
+                    </div>
+                    <!-- Sparkline -->
+                    <div class="mt-2 h-8 w-full opacity-20">
+                        <svg viewBox="0 0 100 20" class="w-full h-full stroke-current text-green-600 fill-none">
+                            <path d="M0 10 Q 10 15, 20 10 T 40 10 T 60 15 T 80 5 T 100 12" stroke-width="2" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Section 2: The Viral Engine -->
+                <div onclick="openCockpitModal('viral')" class="bg-white rounded-2xl shadow-md p-6 relative overflow-visible group cursor-pointer hover:shadow-lg transition-all transform hover:-translate-y-1">
+                    ${drillDownIcon}
+                    <div class="relative group w-max mb-4">
+                        <h3 class="text-lg font-bold text-gray-900 border-b border-dotted border-gray-400">The Viral Engine</h3>
+                        ${renderDevTooltip('GET', '/api/v1/dashboard/virality')}
+                    </div>
+                    <div class="space-y-6">
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span class="text-sm font-medium text-gray-700">Lists Shared (Invites Sent)</span>
+                                <span class="text-sm font-bold text-gray-900">${viralData.listsShared}</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                <div class="bg-blue-600 h-2.5 rounded-full" style="width: 100%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span class="text-sm font-medium text-gray-700">Lists Accepted (New Users)</span>
+                                <span class="text-sm font-bold text-gray-900">${viralData.listsAccepted}</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                <div class="bg-green-500 h-2.5 rounded-full" style="width: ${viralData.conversionRate}%"></div>
+                            </div>
+                        </div>
+                        <div class="bg-blue-50 rounded-lg p-4 flex items-center justify-between">
+                            <div>
+                                <div class="text-sm text-blue-800 font-medium">Viral Conversion Rate</div>
+                                <div class="text-xs text-blue-600">Accepted / Shared</div>
+                            </div>
+                            <div class="text-2xl font-bold text-blue-900">${viralData.conversionRate}%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 3: Core Value & Product Mix -->
+                <div onclick="openCockpitModal('engagement')" class="bg-white rounded-2xl shadow-md p-6 relative overflow-visible group cursor-pointer hover:shadow-lg transition-all transform hover:-translate-y-1">
+                    ${drillDownIcon}
+                    <div class="relative group w-max mb-4">
+                        <h3 class="text-lg font-bold text-gray-900 border-b border-dotted border-gray-400">Core Value & Product Mix</h3>
+                        ${renderDevTooltip('GET', '/api/v1/dashboard/engagement')}
+                    </div>
+                    <div class="flex flex-col h-full justify-between">
+                        <div class="mb-4 relative">
+                            <canvas id="productMixChart" height="100"></canvas>
+                            <!-- Custom Legend Overlay -->
+                            <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <div class="flex gap-8 text-xs font-bold text-white drop-shadow-md">
+                                    <span>Offers: 45%</span>
+                                    <span>Generic: 55%</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-3 mt-4">
+                            <div class="bg-gray-50 p-3 rounded-lg">
+                                <div class="text-xs text-gray-500 mb-1">Generic Items Added</div>
+                                <div class="text-lg font-bold text-gray-900">${engagementData.genericAdded.toLocaleString()}</div>
+                            </div>
+                            <div class="bg-green-50 p-3 rounded-lg">
+                                <div class="text-xs text-green-700 mb-1">Offers Added</div>
+                                <div class="text-lg font-bold text-green-900">${engagementData.offersAdded.toLocaleString()}</div>
+                            </div>
+                            <div class="bg-purple-50 p-3 rounded-lg">
+                                <div class="text-xs text-purple-700 mb-1">Offers Added to Saved</div>
+                                <div class="text-lg font-bold text-purple-900">${engagementData.offersFavorited.toLocaleString()}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 4: Cart Usage -->
+            <div onclick="openCockpitModal('instore')" class="bg-white rounded-2xl shadow-md p-6 relative overflow-visible group cursor-pointer hover:shadow-lg transition-all transform hover:-translate-y-1">
+                ${drillDownIcon}
+                <div class="relative group w-max mb-4">
+                    <h3 class="text-lg font-bold text-gray-900 border-b border-dotted border-gray-400">Cart Usage</h3>
+                    ${renderDevTooltip('GET', '/api/v1/dashboard/instore-actions')}
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 text-center divide-x divide-gray-100">
+                    <div class="px-4">
+                        <div class="text-3xl font-bold text-gray-900">${inStoreData.itemsSlidedBought.toLocaleString()}</div>
+                        <div class="text-sm text-gray-500 mt-1">Items Bought (Slided)</div>
+                    </div>
+                    <div class="px-4">
+                        <div class="text-3xl font-bold text-gray-900">${inStoreData.itemsSlidedToBuy.toLocaleString()}</div>
+                        <div class="text-sm text-gray-500 mt-1">Items To Buy (Slided)</div>
+                    </div>
+                    <div class="px-4">
+                        <div class="text-3xl font-bold text-gray-900">${inStoreData.cartsCreated.toLocaleString()}</div>
+                        <div class="text-sm text-gray-500 mt-1">Total Carts Created</div>
+                    </div>
+                    <div class="px-4">
+                        <div class="text-3xl font-bold text-green-600">CHF ${inStoreData.userSavings.toLocaleString()}</div>
+                        <div class="text-sm text-gray-500 mt-1">Est. User Savings (YTD)</div>
+                        <div class="relative group inline-block">
+                             <div class="mt-2 text-xs text-gray-400 font-mono bg-gray-50 p-1 rounded inline-block border-b border-dotted border-gray-300">Financial Impact</div>
+                             ${renderDevTooltip('GET', '/api/v1/dashboard/financial-impact')}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 5: Geographic Distribution -->
+            <div onclick="openCockpitModal('geo')" class="bg-white rounded-2xl shadow-md p-6 relative overflow-visible group cursor-pointer hover:shadow-lg transition-all transform hover:-translate-y-1">
+                ${drillDownIcon}
+                <div class="relative group w-max mb-4">
+                    <h3 class="text-lg font-bold text-gray-900 border-b border-dotted border-gray-400">Geographic Distribution</h3>
+                    ${renderDevTooltip('GET', '/api/v1/dashboard/geo-distribution')}
+                </div>
+                <div class="space-y-4">
+                    ${geoData.breakdown.map(canton => `
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span class="text-sm font-medium text-gray-700">${canton.name} (${canton.code})</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs ${canton.growth >= 0 ? 'text-green-600' : 'text-red-600'} font-medium">
+                                        ${canton.growth >= 0 ? '↑' : '↓'} ${Math.abs(canton.growth)}%
+                                    </span>
+                                    <span class="text-sm font-bold text-gray-900">${canton.users.toLocaleString()}</span>
+                                </div>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                <div class="bg-indigo-600 h-2.5 rounded-full" style="width: ${(canton.users / 4500) * 100}%"></div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+
+            <!-- Modal Overlay -->
+            ${cockpitModal ? renderCockpitModal() : ''}
+        </div>
+    `;
+}
+
+// Helper to get Drill-Down Data
+function getDrillDownData() {
+    // Get active campaigns for breakdown
+    const activeCampaigns = (typeof campaigns !== 'undefined' && campaigns.length) 
+        ? campaigns.filter(c => c.status === 'active') 
+        : [{name: 'Summer Launch'}, {name: 'Influencer Push'}];
+
+    // Simulate data for campaigns
+    const campaignDownloads = activeCampaigns.map(c => ({ label: c.name, value: Math.floor(Math.random() * 25) + 10 }));
+    const campaignActive = activeCampaigns.map(c => ({ label: c.name, value: Math.floor(Math.random() * 20) + 5 }));
+
+    // Generate 90 days of trend data
+    const trendData = Array.from({length: 90}, (_, i) => {
+        const date = new Date();
+        date.setDate(date.getDate() - (89 - i));
+        const dateStr = date.toISOString().split('T')[0];
+        // Base growth curve with some noise
+        const baseDownloads = 1500 + (i * 40) + (Math.sin(i * 0.1) * 100) + (Math.random() * 50);
+        // WAU is roughly 40-60% of downloads, fluctuating
+        const wauRatio = 0.4 + (Math.sin(i * 0.2) * 0.1) + (Math.random() * 0.05);
+        const wau = Math.floor(baseDownloads * wauRatio);
+        
+        return {
+            date: dateStr,
+            totalDownloads: Math.floor(baseDownloads),
+            wau: wau
+        };
+    });
+
+    return {
+        growth: {
+            trend: trendData,
+            sources: {
+                downloads: [
+                    { label: 'Organic + Direct', value: 35 },
+                    { label: 'Referral', value: 15 },
+                    ...campaignDownloads
+                ],
+                activeUsers: [
+                    { label: 'Organic + Direct', value: 45 },
+                    { label: 'Referral', value: 25 },
+                    ...campaignActive
+                ]
+            }
+        },
+        retention: {
+            cohorts: [
+                { month: 'Jan', m0: 100, m1: 45, m2: 32, m3: 20 },
+                { month: 'Feb', m0: 100, m1: 48, m2: 35, m3: 28 },
+                { month: 'Mar', m0: 100, m1: 52, m2: 40, m3: null }
+            ]
+        },
+        viral: {
+            funnel: [
+                { date: '06-01', sent: 45, accepted: 20 },
+                { date: '06-02', sent: 50, accepted: 28 },
+                { date: '06-03', sent: 65, accepted: 35 },
+                { date: '06-04', sent: 80, accepted: 45 },
+                { date: '06-05', sent: 95, accepted: 60 },
+                { date: '06-06', sent: 120, accepted: 85 },
+                { date: '06-07', sent: 110, accepted: 75 }
+            ],
+            referrers: [
+                { id: 'u_992', invites: 150, rate: 80.5 },
+                { id: 'u_845', invites: 120, rate: 75.2 },
+                { id: 'u_123', invites: 95, rate: 68.0 },
+                { id: 'u_567', invites: 80, rate: 62.5 },
+                { id: 'u_334', invites: 65, rate: 55.0 }
+            ]
+        },
+        engagement: {
+            stores: [
+                { name: 'Migros', added: 4500, favorited: 1200 },
+                { name: 'Coop', added: 6200, favorited: 1500 },
+                { name: 'Denner', added: 2100, favorited: 300 },
+                { name: 'Aldi', added: 1800, favorited: 150 },
+                { name: 'Lidl', added: 1200, favorited: 100 }
+            ]
+        },
+        instore: {
+            heatmap: [
+                { day: 'Mon', times: [12, 45, 30, 65] }, // Morning, Lunch, Afternoon, Evening
+                { day: 'Tue', times: [15, 48, 35, 70] },
+                { day: 'Wed', times: [18, 50, 40, 75] },
+                { day: 'Thu', times: [20, 55, 45, 85] },
+                { day: 'Fri', times: [25, 60, 55, 95] },
+                { day: 'Sat', times: [98, 85, 75, 60] },
+                { day: 'Sun', times: [10, 20, 15, 30] }
+            ]
+        },
+        geo: {
+            cantons: [
+                { code: 'BS', name: 'Basel-Stadt', value: 85, growth: 5.2 },
+                { code: 'BL', name: 'Basel-Landschaft', value: 60, growth: 3.1 },
+                { code: 'AG', name: 'Aargau', value: 70, growth: 4.5 },
+                { code: 'ZH', name: 'Zurich', value: 95, growth: 12.5 },
+                { code: 'SH', name: 'Schaffhausen', value: 40, growth: 1.2 },
+                { code: 'TG', name: 'Thurgau', value: 50, growth: 2.8 },
+                { code: 'JU', name: 'Jura', value: 30, growth: -1.5 },
+                { code: 'SO', name: 'Solothurn', value: 55, growth: 3.4 },
+                { code: 'BE', name: 'Bern', value: 75, growth: -1.5 },
+                { code: 'LU', name: 'Lucerne', value: 65, growth: 6.7 },
+                { code: 'ZG', name: 'Zug', value: 80, growth: 9.2 },
+                { code: 'SZ', name: 'Schwyz', value: 50, growth: 4.1 },
+                { code: 'GL', name: 'Glarus', value: 20, growth: 0.5 },
+                { code: 'SG', name: 'St. Gallen', value: 60, growth: 5.5 },
+                { code: 'AR', name: 'Appenzell Ausserrhoden', value: 35, growth: 1.8 },
+                { code: 'AI', name: 'Appenzell Innerrhoden', value: 25, growth: 0.9 },
+                { code: 'NE', name: 'Neuchâtel', value: 45, growth: 2.2 },
+                { code: 'FR', name: 'Fribourg', value: 50, growth: 3.8 },
+                { code: 'VD', name: 'Vaud', value: 85, growth: 8.2 },
+                { code: 'OW', name: 'Obwalden', value: 30, growth: 1.1 },
+                { code: 'NW', name: 'Nidwalden', value: 35, growth: 1.5 },
+                { code: 'UR', name: 'Uri', value: 20, growth: 0.2 },
+                { code: 'GR', name: 'Graubünden', value: 45, growth: 4.8 },
+                { code: 'GE', name: 'Geneva', value: 90, growth: 22.0 },
+                { code: 'VS', name: 'Valais', value: 55, growth: 6.5 },
+                { code: 'TI', name: 'Ticino', value: 60, growth: 5.4 }
+            ]
+        }
+    };
+}
+
+// Modal Rendering Logic
+function renderCockpitModal() {
+    let title = '';
+    let content = '';
+    let endpoint = '';
+    const data = getDrillDownData();
+
+    switch(cockpitModal) {
+        case 'growth':
+            title = 'Acquisition & Trend Analysis';
+            endpoint = 'GET /api/v1/analytics/growth-trend?period=30d';
+            content = `
+                <div class="space-y-6">
+                    <div class="bg-white p-4 rounded-lg border border-gray-200">
+                        <div class="flex justify-between items-center mb-4">
+                            <h4 class="text-sm font-bold text-gray-700">Active Users % (WAU / Total Downloads)</h4>
+                            <div class="flex space-x-2">
+                                <button onclick="updateGrowthGranularity('daily')" class="px-3 py-1 text-xs rounded-md ${growthGranularity === 'daily' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}">Daily</button>
+                                <button onclick="updateGrowthGranularity('weekly')" class="px-3 py-1 text-xs rounded-md ${growthGranularity === 'weekly' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}">Weekly</button>
+                                <button onclick="updateGrowthGranularity('monthly')" class="px-3 py-1 text-xs rounded-md ${growthGranularity === 'monthly' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}">Monthly</button>
+                            </div>
+                        </div>
+                        <div class="h-64">
+                            <canvas id="growthTrendChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-white p-4 rounded-lg border border-gray-200">
+                            <h4 class="text-sm font-bold text-gray-700 mb-4">Total Downloads Breakdown</h4>
+                            <div class="h-48 flex justify-center">
+                                <canvas id="downloadsSourceChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="bg-white p-4 rounded-lg border border-gray-200">
+                            <h4 class="text-sm font-bold text-gray-700 mb-4">Active Users Breakdown</h4>
+                            <div class="h-48 flex justify-center">
+                                <canvas id="activeUsersSourceChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            break;
+        case 'retention':
+            title = 'Cohort Retention Heatmap';
+            endpoint = 'GET /api/v1/analytics/cohorts';
+            content = `
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cohort</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Month 0</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Month 1</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Month 2</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Month 3</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            ${data.retention.cohorts.map(c => `
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">${c.month}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-white bg-green-600">${c.m0}%</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 bg-green-200">${c.m1}%</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 bg-green-100">${c.m2}%</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 ${c.m3 ? 'bg-green-50' : ''}">${c.m3 || '-'}%</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            break;
+        case 'viral':
+            title = 'Viral Conversion Funnel';
+            endpoint = 'GET /api/v1/analytics/viral-funnel';
+            content = `
+                <div class="space-y-6">
+                    <div class="bg-white p-4 rounded-lg border border-gray-200">
+                        <h4 class="text-sm font-bold text-gray-700 mb-4">Invites Sent vs Accepted</h4>
+                        <div class="h-64">
+                            <canvas id="viralFunnelChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg border border-gray-200">
+                        <h4 class="text-sm font-bold text-gray-700 mb-4">Top Referrers Leaderboard</h4>
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">User ID</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Invites</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Conv. Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                ${data.viral.referrers.map(r => `
+                                    <tr>
+                                        <td class="px-4 py-2 text-sm font-mono text-gray-900">${r.id}</td>
+                                        <td class="px-4 py-2 text-sm text-gray-900">${r.invites}</td>
+                                        <td class="px-4 py-2 text-sm text-green-600 font-bold">${r.rate}%</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            break;
+        case 'engagement':
+            title = 'Store Offer Performance';
+            endpoint = 'GET /api/v1/analytics/store-preference';
+            const categories = ['All Categories', 'Meat', 'Fruit & Vegetables', 'Dairy', 'Bakery', 'Beverages', 'Household', 'Personal Care'];
+            content = `
+                <div class="bg-white p-4 rounded-lg border border-gray-200">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="text-sm font-bold text-gray-700">Offers Added vs Favorited by Store</h4>
+                        <select onchange="updateEngagementCategory(this.value)" class="text-xs border-gray-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                            ${categories.map(c => `<option value="${c}">${c}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="h-80">
+                        <canvas id="storePreferenceChart"></canvas>
+                    </div>
+                </div>
+            `;
+            break;
+        case 'instore':
+            title = 'Item Interaction Heatmap (Bought/Unbought Actions)';
+            endpoint = 'GET /api/v1/analytics/shopping-times';
+            const timeLabels = ['Morning', 'Lunch', 'Afternoon', 'Evening'];
+            content = `
+                <div class="space-y-4">
+                    <p class="text-sm text-gray-500">
+                        Visualizing the intensity of user actions: sliding items to "Bought" and back to "To Buy".
+                        <span class="inline-block w-3 h-3 bg-blue-100 ml-2 border border-gray-200"></span> Low
+                        <span class="inline-block w-3 h-3 bg-blue-300 ml-1 border border-gray-200"></span> Med
+                        <span class="inline-block w-3 h-3 bg-blue-500 ml-1 border border-gray-200"></span> High
+                        <span class="inline-block w-3 h-3 bg-blue-700 ml-1 border border-gray-200"></span> Peak
+                    </p>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full border-collapse">
+                            <thead>
+                                <tr>
+                                    <th class="p-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-left">Time / Day</th>
+                                    ${data.instore.heatmap.map(d => `<th class="p-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">${d.day}</th>`).join('')}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${timeLabels.map((time, timeIdx) => `
+                                    <tr>
+                                        <td class="p-3 text-sm font-bold text-gray-700 border-b border-gray-100">${time}</td>
+                                        ${data.instore.heatmap.map(d => {
+                                            const val = d.times[timeIdx];
+                                            let colorClass = 'bg-blue-50 text-blue-900'; // Default/Low
+                                            if (val > 80) colorClass = 'bg-blue-700 text-white font-bold'; // Peak
+                                            else if (val > 60) colorClass = 'bg-blue-500 text-white'; // High
+                                            else if (val > 40) colorClass = 'bg-blue-300 text-blue-900'; // Med
+                                            else if (val > 20) colorClass = 'bg-blue-100 text-blue-900'; // Low-Med
+                                            
+                                            return `<td class="p-3 text-center text-sm ${colorClass} border border-white transition-colors hover:opacity-90 cursor-default" title="${val} Actions">${val}</td>`;
+                                        }).join('')}
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            break;
+        case 'geo':
+            title = 'Swiss Canton Performance (Sorted by Penetration)';
+            endpoint = 'GET /api/v1/analytics/geo-heatmap';
+            
+            // Sort cantons by value (Penetration) descending
+            const sortedCantons = [...data.geo.cantons].sort((a, b) => b.value - a.value);
+            
+            const renderTile = (canton) => {
+                const intensity = canton.value;
+                let bgClass = 'bg-gray-100';
+                let textClass = 'text-gray-500';
+                
+                if (intensity > 80) { bgClass = 'bg-green-600'; textClass = 'text-white'; }
+                else if (intensity > 60) { bgClass = 'bg-green-500'; textClass = 'text-white'; }
+                else if (intensity > 40) { bgClass = 'bg-green-400'; textClass = 'text-white'; }
+                else if (intensity > 20) { bgClass = 'bg-green-200'; textClass = 'text-green-900'; }
+                
+                return `
+                    <div class="w-24 h-24 ${bgClass} rounded-lg flex flex-col items-center justify-center p-1 cursor-pointer hover:scale-105 transition-transform shadow-sm relative group">
+                        <span class="text-lg font-bold ${textClass}">${canton.code}</span>
+                        <span class="text-sm ${textClass}">${intensity}%</span>
+                        
+                        <!-- Tooltip -->
+                        <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-10 w-40 bg-gray-900 text-white text-xs rounded p-2 text-center shadow-lg">
+                            <div class="font-bold text-sm mb-1">${canton.name}</div>
+                            <div class="grid grid-cols-2 gap-x-2 text-left">
+                                <span class="text-gray-400">Penetration:</span>
+                                <span class="font-mono text-right">${intensity}%</span>
+                                <span class="text-gray-400">Growth:</span>
+                                <span class="font-mono text-right ${canton.growth >= 0 ? 'text-green-400' : 'text-red-400'}">${canton.growth}%</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            };
+
+            content = `
+                <div class="flex flex-col items-center">
+                    <div class="mb-6 flex gap-4 text-sm">
+                        <div class="flex items-center gap-1"><div class="w-3 h-3 bg-green-200 rounded"></div> Low</div>
+                        <div class="flex items-center gap-1"><div class="w-3 h-3 bg-green-400 rounded"></div> Med</div>
+                        <div class="flex items-center gap-1"><div class="w-3 h-3 bg-green-600 rounded"></div> High</div>
+                    </div>
+                    
+                    <div class="flex flex-wrap justify-center gap-3 w-full max-w-4xl p-6 bg-gray-50 rounded-xl border border-gray-200">
+                        ${sortedCantons.map(c => renderTile(c)).join('')}
+                    </div>
+
+                    <!-- Definitions Section -->
+                    <div class="mt-8 w-full max-w-4xl bg-blue-50 border border-blue-100 rounded-lg p-4">
+                        <h5 class="text-sm font-bold text-blue-900 mb-2 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            Metric Definitions
+                        </h5>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                            <div>
+                                <span class="font-semibold text-blue-800">Penetration Rate (%)</span>
+                                <p class="text-blue-700 mt-1">
+                                    The percentage of the targetable population in the canton that are active users.
+                                    <br>
+                                    <code class="text-xs bg-blue-100 px-1 rounded mt-1 inline-block">(Active Users / Total Target Population) × 100</code>
+                                </p>
+                            </div>
+                            <div>
+                                <span class="font-semibold text-blue-800">Growth Rate (%)</span>
+                                <p class="text-blue-700 mt-1">
+                                    The period-over-period increase or decrease in active users.
+                                    <br>
+                                    <code class="text-xs bg-blue-100 px-1 rounded mt-1 inline-block">((Current Users - Previous Users) / Previous Users) × 100</code>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            break;
+        default:
+            title = 'Details';
+            content = '<p class="p-4">No details available.</p>';
+    }
+
+    return `
+        <div class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+            <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onclick="closeCockpitModal()"></div>
+                <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+                <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <div class="flex justify-between items-center mb-4 border-b border-gray-200 pb-2">
+                            <div>
+                                <h3 class="text-xl leading-6 font-bold text-gray-900" id="modal-title">${title}</h3>
+                                ${cockpitDevMode ? `<div class="text-xs text-gray-400 font-mono mt-1">Endpoint: ${endpoint}</div>` : ''}
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <select class="text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                                    <option>Last 7 Days</option>
+                                    <option selected>Last 30 Days</option>
+                                    <option>Year to Date</option>
+                                </select>
+                                <button onclick="closeCockpitModal()" class="text-gray-400 hover:text-gray-500">
+                                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            ${content}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Render Charts inside Modal
+function renderCockpitModalCharts() {
+    if (!cockpitModal) return;
+    const data = getDrillDownData();
+
+    if (cockpitModal === 'growth') {
+        // Process data based on granularity
+        let chartLabels = [];
+        let chartDataDownloads = [];
+        let chartDataWAU = [];
+        let chartDataPct = [];
+        
+        const rawData = data.growth.trend; // 90 days of data
+        
+        if (growthGranularity === 'daily') {
+            // Last 30 days
+            const slice = rawData.slice(-30);
+            chartLabels = slice.map(d => d.date.slice(5));
+            chartDataDownloads = slice.map(d => d.totalDownloads);
+            chartDataWAU = slice.map(d => d.wau);
+            chartDataPct = slice.map(d => (d.wau / d.totalDownloads * 100).toFixed(1));
+        } else if (growthGranularity === 'weekly') {
+            // Aggregate by week (last 12 weeks)
+            for (let i = 0; i < 12; i++) {
+                const endIdx = rawData.length - (i * 7);
+                const startIdx = Math.max(0, endIdx - 7);
+                if (endIdx <= 0) break;
+                
+                const chunk = rawData.slice(startIdx, endIdx);
+                if (chunk.length === 0) continue;
+                
+                const avgDownloads = chunk.reduce((sum, d) => sum + d.totalDownloads, 0) / chunk.length;
+                const avgWAU = chunk.reduce((sum, d) => sum + d.wau, 0) / chunk.length;
+                
+                chartLabels.unshift(`Week ${12-i}`);
+                chartDataDownloads.unshift(Math.round(avgDownloads));
+                chartDataWAU.unshift(Math.round(avgWAU));
+                chartDataPct.unshift((avgWAU / avgDownloads * 100).toFixed(1));
+            }
+        } else if (growthGranularity === 'monthly') {
+            // Aggregate by month
+            const months = {};
+            rawData.forEach(d => {
+                const month = d.date.slice(0, 7); // YYYY-MM
+                if (!months[month]) months[month] = { downloads: [], wau: [] };
+                months[month].downloads.push(d.totalDownloads);
+                months[month].wau.push(d.wau);
+            });
+            
+            Object.keys(months).sort().forEach(m => {
+                const dArr = months[m].downloads;
+                const wArr = months[m].wau;
+                const avgD = dArr.reduce((a,b)=>a+b,0)/dArr.length;
+                const avgW = wArr.reduce((a,b)=>a+b,0)/wArr.length;
+                
+                chartLabels.push(m);
+                chartDataDownloads.push(Math.round(avgD));
+                chartDataWAU.push(Math.round(avgW));
+                chartDataPct.push((avgW / avgD * 100).toFixed(1));
+            });
+        }
+
+        // Growth Trend Chart
+        new Chart(document.getElementById('growthTrendChart'), {
+            type: 'bar',
+            data: {
+                labels: chartLabels,
+                datasets: [
+                    {
+                        label: 'Active Users %',
+                        data: chartDataPct,
+                        backgroundColor: '#10B981', // Green
+                        borderRadius: 4,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const idx = context.dataIndex;
+                                const pct = context.raw;
+                                const absWAU = chartDataWAU[idx];
+                                const absTotal = chartDataDownloads[idx];
+                                return [
+                                    `Active Users %: ${pct}%`,
+                                    `Active Users: ${absWAU.toLocaleString()}`,
+                                    `Total Downloads: ${absTotal.toLocaleString()}`
+                                ];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: { 
+                        beginAtZero: true,
+                        max: 100,
+                        title: { display: true, text: 'Percentage (%)' }
+                    }
+                }
+            }
+        });
+
+        // Downloads Source Pie Chart
+        new Chart(document.getElementById('downloadsSourceChart'), {
+            type: 'doughnut',
+            data: {
+                labels: data.growth.sources.downloads.map(s => s.label),
+                datasets: [{
+                    data: data.growth.sources.downloads.map(s => s.value),
+                    backgroundColor: ['#3B82F6', '#EC4899', '#10B981', '#6B7280', '#8B5CF6', '#F59E0B']
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+
+        // Active Users Source Pie Chart
+        new Chart(document.getElementById('activeUsersSourceChart'), {
+            type: 'doughnut',
+            data: {
+                labels: data.growth.sources.activeUsers.map(s => s.label),
+                datasets: [{
+                    data: data.growth.sources.activeUsers.map(s => s.value),
+                    backgroundColor: ['#3B82F6', '#EC4899', '#10B981', '#6B7280', '#8B5CF6', '#F59E0B']
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+
+    if (cockpitModal === 'viral') {
+        new Chart(document.getElementById('viralFunnelChart'), {
+            type: 'bar',
+            data: {
+                labels: data.viral.funnel.map(d => d.date),
+                datasets: [
+                    {
+                        label: 'Invites Accepted',
+                        data: data.viral.funnel.map(d => d.accepted),
+                        backgroundColor: '#10B981',
+                        stack: 'Stack 0',
+                    },
+                    {
+                        label: 'Invites Sent',
+                        data: data.viral.funnel.map(d => d.sent - d.accepted), // Show remaining sent
+                        backgroundColor: '#3B82F6',
+                        stack: 'Stack 0',
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { tooltip: { mode: 'index', intersect: false } },
+                scales: { x: { stacked: true }, y: { stacked: true } }
+            }
+        });
+    }
+
+    if (cockpitModal === 'engagement') {
+        const ctx = document.getElementById('storePreferenceChart');
+        if (window.charts && window.charts.storePreference) {
+            window.charts.storePreference.destroy();
+        }
+        window.charts = window.charts || {};
+        
+        window.charts.storePreference = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.engagement.stores.map(s => s.name),
+                datasets: [
+                    {
+                        label: 'Offers Added',
+                        data: data.engagement.stores.map(s => s.added),
+                        backgroundColor: '#10B981',
+                    },
+                    {
+                        label: 'Offers Favorited',
+                        data: data.engagement.stores.map(s => s.favorited),
+                        backgroundColor: '#8B5CF6',
+                    }
+                ]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { x: { stacked: false }, y: { stacked: false } }
+            }
+        });
+    }
+}
+
+// Cockpit Helper Functions
+window.toggleCockpitDevMode = function() {
+    cockpitDevMode = !cockpitDevMode;
+    renderApp();
+};
+
+window.setCockpitTimeRange = function(range) {
+    cockpitTimeRange = range;
+    renderApp();
+};
+
+window.setCockpitCanton = function(canton) {
+    cockpitCanton = canton;
+    renderApp();
+};
+
+window.openCockpitModal = function(type) {
+    cockpitModal = type;
+    renderApp();
+};
+
+window.closeCockpitModal = function() {
+    cockpitModal = null;
+    renderApp();
+};
+
+window.updateEngagementCategory = function(category) {
+    if (!window.charts || !window.charts.storePreference) return;
+
+    const chart = window.charts.storePreference;
+    const data = getDrillDownData().engagement.stores;
+    
+    // Simulate filtering by modifying the data based on category
+    // In a real app, this would fetch data from the endpoint
+    const factor = category === 'All Categories' ? 1 : Math.random() * 0.5 + 0.1;
+    
+    const newData = data.map(s => ({
+        name: s.name,
+        added: Math.round(s.added * factor * (0.8 + Math.random() * 0.4)),
+        favorited: Math.round(s.favorited * factor * (0.8 + Math.random() * 0.4))
+    }));
+
+    chart.data.datasets[0].data = newData.map(s => s.added);
+    chart.data.datasets[1].data = newData.map(s => s.favorited);
+    chart.update();
+};
+
+window.updateGrowthGranularity = function(granularity) {
+    growthGranularity = granularity;
+    renderApp();
+};
+
+function renderCEOCockpitCharts() {
+    const ctx = document.getElementById('productMixChart');
+    if (!ctx) return;
+
+    // Destroy existing chart if it exists
+    if (typeof charts !== 'undefined' && charts.productMix) {
+        charts.productMix.destroy();
+    } else {
+        window.charts = window.charts || {};
+    }
+
+    window.charts.productMix = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Product Mix'],
+            datasets: [
+                {
+                    label: 'Offers Added',
+                    data: [45],
+                    backgroundColor: '#10B981', // Green-500
+                    barThickness: 50
+                },
+                {
+                    label: 'Generic Items Added',
+                    data: [55],
+                    backgroundColor: '#9CA3AF', // Gray-400
+                    barThickness: 50
+                }
+            ]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    enabled: false
+                }
+            },
+            scales: {
+                x: {
+                    stacked: true,
+                    display: false,
+                    max: 100
+                },
+                y: {
+                    stacked: true,
+                    display: false
+                }
+            },
+            animation: {
+                duration: 1000
+            }
+        }
+    });
 }
 
 function renderDashboard() {
@@ -1985,45 +3053,49 @@ window.downloadQR = function(qrElementId, qrId) {
     const canvas = qrElement.querySelector('canvas');
     if (!canvas) return;
     
-    // Create a new canvas with branding
-    const brandedCanvas = document.createElement('canvas');
-    const ctx = brandedCanvas.getContext('2d');
-    const size = 600;
-    brandedCanvas.width = size;
-    brandedCanvas.height = size + 120; // Extra space for branding
-    
-    // White background
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, size, size + 120);
-    
-    // Draw Rappn branding at top
-    ctx.fillStyle = '#3aaa35';
-    ctx.fillRect(0, 0, size, 80);
-    
-    // Rappn logo/text
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 48px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('RAPPN', size / 2, 55);
-    
-    // Draw QR code (larger for better scanning)
-    const qrSize = 480;
-    const qrPadding = (size - qrSize) / 2;
-    ctx.drawImage(canvas, qrPadding, 100, qrSize, qrSize);
-    
-    // QR ID at bottom
-    ctx.fillStyle = '#333333';
-    ctx.font = '18px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(qrId, size / 2, size + 105);
-    
-    // Download
-    brandedCanvas.toBlob(function(blob) {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${qrId}.png`;
-        a.click();
-        URL.revokeObjectURL(url);
-    });
+    const logoImg = new Image();
+    logoImg.onload = function() {
+        // Create a new canvas with branding
+        const brandedCanvas = document.createElement('canvas');
+        const ctx = brandedCanvas.getContext('2d');
+        const size = 600;
+        brandedCanvas.width = size;
+        brandedCanvas.height = size + 120; // Extra space for branding
+        
+        // White background
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, size, size + 120);
+        
+        // Draw Rappn branding at top
+        ctx.fillStyle = '#3aaa35';
+        ctx.fillRect(0, 0, size, 80);
+        
+        // Rappn logo
+        const logoHeight = 60;
+        const logoWidth = (logoImg.width / logoImg.height) * logoHeight;
+        const logoX = (size - logoWidth) / 2;
+        ctx.drawImage(logoImg, logoX, 10, logoWidth, logoHeight);
+        
+        // Draw QR code (larger for better scanning)
+        const qrSize = 480;
+        const qrPadding = (size - qrSize) / 2;
+        ctx.drawImage(canvas, qrPadding, 100, qrSize, qrSize);
+        
+        // QR ID at bottom
+        ctx.fillStyle = '#333333';
+        ctx.font = '18px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(qrId, size / 2, size + 105);
+        
+        // Download
+        brandedCanvas.toBlob(function(blob) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${qrId}.png`;
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+    };
+    logoImg.src = '/logo.svg';
 };
