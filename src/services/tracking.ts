@@ -79,6 +79,8 @@ router.post('/build-placement-link', async (req: Request, res: Response) => {
 
     // Save placement to database (optional but recommended for tracking)
     let tracked_url = final_url;
+    let redirect_code: string | undefined;
+    
     try {
       const placement = await memoryDb.createPlacement({
         campaign_id: input.campaign_id,
@@ -96,9 +98,9 @@ router.post('/build-placement-link', async (req: Request, res: Response) => {
       });
 
       try {
-        const redirectCode = await memoryDb.createRedirectCode(placement.id || 0, final_url);
-        tracked_url = `${getTrackingBaseUrl()}/r/${redirectCode}`;
-        placement.redirect_code = redirectCode;
+        redirect_code = await memoryDb.createRedirectCode(placement.id || 0, final_url);
+        tracked_url = `${getTrackingBaseUrl()}/r/${redirect_code}`;
+        placement.redirect_code = redirect_code;
         placement.tracked_url = tracked_url;
       } catch (redirectError) {
         console.warn('Failed to generate redirect code:', redirectError);
@@ -129,6 +131,7 @@ router.post('/build-placement-link', async (req: Request, res: Response) => {
       qr_id,
       final_url,
       tracked_url,
+      redirect_code,
     };
 
     res.json(output);
@@ -156,6 +159,50 @@ router.get('/placements/:campaign_id', async (req: Request, res: Response) => {
       error: 'Failed to fetch placements',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
+  }
+});
+
+/**
+ * POST /tracking/shorten-existing
+ * Generate a short link for an existing placement if missing
+ */
+router.post('/shorten-existing', async (req: Request, res: Response) => {
+  try {
+    const { placement_id, final_url } = req.body;
+    
+    if (!placement_id || !final_url) {
+      return res.status(400).json({ error: 'Missing placement_id or final_url' });
+    }
+
+    // Check if placement exists
+    const placement = await memoryDb.getPlacementById(placement_id);
+    if (!placement) {
+      return res.status(404).json({ error: 'Placement not found' });
+    }
+
+    // If already has tracked_url, return it
+    if (placement.tracked_url) {
+      return res.json({ tracked_url: placement.tracked_url });
+    }
+
+    // Generate new code
+    const redirectCode = await memoryDb.createRedirectCode(placement_id, final_url);
+    const tracked_url = `${getTrackingBaseUrl()}/r/${redirectCode}`;
+    
+    // Update placement in memory
+    placement.redirect_code = redirectCode;
+    placement.tracked_url = tracked_url;
+
+    // Update in Sheets
+    savePlacementToSheets({
+      ...placement,
+      tracked_url
+    }).catch(err => console.error('Failed to update placement in Sheets:', err));
+
+    res.json({ tracked_url, redirect_code: redirectCode });
+  } catch (error) {
+    console.error('Error generating short link:', error);
+    res.status(500).json({ error: 'Failed to generate short link' });
   }
 });
 
@@ -231,6 +278,88 @@ router.post('/click', async (req: Request, res: Response) => {
       error: 'Failed to record click',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
+  }
+});
+
+/**
+ * POST /tracking/resolve-ref
+ * Resolve a ref code and record a click (Client-side tracking)
+ */
+router.post('/resolve-ref', async (req: Request, res: Response) => {
+  try {
+    const { ref } = req.body;
+    console.log(`🔍 Resolving ref code: ${ref}`);
+    
+    if (!ref) {
+      return res.status(400).json({ error: 'Missing ref code' });
+    }
+
+    const redirectData = await memoryDb.getRedirect(ref);
+    if (!redirectData) {
+      console.warn(`❌ Ref code not found: ${ref}`);
+      return res.status(404).json({ error: 'Invalid ref code' });
+    }
+
+    const placement = await memoryDb.getPlacementById(redirectData.placement_id);
+    if (!placement) {
+      console.warn(`❌ Placement not found for ref: ${ref} (Placement ID: ${redirectData.placement_id})`);
+      return res.status(404).json({ error: 'Placement not found' });
+    }
+
+    console.log(`✅ Ref resolved: ${ref} -> Placement ${placement.id} (${placement.campaign_id})`);
+
+    // Record the click
+    const user_agent = req.headers['user-agent'];
+    const ip = req.ip;
+    const refererHeader = req.headers['referer'] || req.headers['referrer'];
+    const referrer = Array.isArray(refererHeader) ? refererHeader[0] : refererHeader;
+
+    await memoryDb.recordClick({
+      placement_id: placement.id,
+      campaign_id: placement.campaign_id,
+      url: placement.final_url,
+      user_agent,
+      ip,
+    });
+
+    // Save to Google Sheets
+    try {
+      const saved = await saveClickToSheets({
+        click_id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        campaign_id: placement.campaign_id,
+        placement_id: placement.id || 0,
+        channel: placement.channel,
+        ad_type: placement.ad_type,
+        medium: placement.medium,
+        utm_source: placement.utm_source || '',
+        utm_campaign: placement.utm_campaign || '',
+        utm_medium: placement.utm_medium || '',
+        utm_content: placement.utm_content || '',
+        final_url: placement.final_url,
+        ip_address: ip,
+        user_agent,
+        referrer,
+      });
+      
+      if (!saved) {
+        console.error('❌ Failed to save click to Google Sheets (returned false)');
+      }
+    } catch (sheetError) {
+      console.error('❌ Exception saving click to Google Sheets:', sheetError);
+    }
+
+    res.json({ 
+      success: true,
+      placement: {
+        final_url: placement.final_url,
+        utm_source: placement.utm_source,
+        utm_medium: placement.utm_medium,
+        utm_campaign: placement.utm_campaign
+      }
+    });
+  } catch (error) {
+    console.error('Error resolving ref:', error);
+    res.status(500).json({ error: 'Failed to resolve ref' });
   }
 });
 

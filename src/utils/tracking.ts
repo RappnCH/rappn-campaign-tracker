@@ -98,18 +98,37 @@ export function buildFinalUrl(
   },
   qrId: string
 ): string {
-  const url = new URL(baseUrl);
-
-  // Add UTM parameters
-  url.searchParams.set('utm_source', utms.utm_source);
-  url.searchParams.set('utm_medium', utms.utm_medium);
-  url.searchParams.set('utm_campaign', utms.utm_campaign);
-  url.searchParams.set('utm_content', utms.utm_content);
-
-  // Add QR ID if present (using 'qr' parameter)
-  if (qrId) {
-    url.searchParams.set('qr', qrId);
+  // Ensure protocol exists
+  let urlString = baseUrl.trim();
+  if (!urlString.match(/^https?:\/\//)) {
+    urlString = 'https://' + urlString;
   }
 
-  return url.toString();
+  try {
+    const url = new URL(urlString);
+
+    // Add UTM parameters
+    url.searchParams.set('utm_source', utms.utm_source);
+    url.searchParams.set('utm_medium', utms.utm_medium);
+    url.searchParams.set('utm_campaign', utms.utm_campaign);
+    url.searchParams.set('utm_content', utms.utm_content);
+
+    // Add QR ID if present (using 'qr' parameter)
+    if (qrId) {
+      url.searchParams.set('qr', qrId);
+    }
+
+    return url.toString();
+  } catch (error) {
+    console.error('Invalid URL provided:', baseUrl);
+    // Fallback: just append query params manually if URL parsing fails
+    const params = new URLSearchParams();
+    params.set('utm_source', utms.utm_source);
+    params.set('utm_medium', utms.utm_medium);
+    params.set('utm_campaign', utms.utm_campaign);
+    params.set('utm_content', utms.utm_content);
+    if (qrId) params.set('qr', qrId);
+    
+    return `${urlString}${urlString.includes('?') ? '&' : '?'}${params.toString()}`;
+  }
 }

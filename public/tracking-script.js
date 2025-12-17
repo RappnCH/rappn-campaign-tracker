@@ -12,9 +12,11 @@
   // CONFIGURATION
   // Change this to your production backend URL
   const TRACKING_API_URL = 'https://rappn-campaign-tracker-production.up.railway.app/tracking/page-view';
+  const RESOLVE_REF_URL = 'https://rappn-campaign-tracker-production.up.railway.app/tracking/resolve-ref';
   
   // Extract UTM parameters from the current page URL
   const urlParams = new URLSearchParams(window.location.search);
+  const refCode = urlParams.get('ref') || urlParams.get('r');
   
   // Helper to get cookie value
   function getCookie(name) {
@@ -29,7 +31,34 @@
   const hasConsent = getCookie('cookie_consent') === 'accepted' || true; // Defaulting to true for now to ensure tracking works
 
   if (hasConsent) {
-    // Gather tracking data
+    // Handle Ref Code (Short Link)
+    if (refCode) {
+      console.log('🔗 Resolving ref code:', refCode);
+      fetch(RESOLVE_REF_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ref: refCode }),
+        keepalive: true,
+        mode: 'cors'
+      })
+      .then(res => {
+        if (!res.ok) throw new Error(`Server returned ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        if (data.success) {
+          console.log('✅ Ref code resolved and tracked');
+          // Optional: Clean up URL
+          // const newUrl = window.location.href.split('?')[0];
+          // window.history.replaceState({}, document.title, newUrl);
+        } else {
+          console.warn('⚠️ Ref resolution returned failure:', data);
+        }
+      })
+      .catch(err => console.error('❌ Ref resolution failed:', err));
+    }
+
+    // Gather tracking data (Standard UTMs)
     const trackingData = {
       utm_source: urlParams.get('utm_source'),
       utm_medium: urlParams.get('utm_medium'),
@@ -44,6 +73,10 @@
       // city: ...
     };
 
+    // Only send standard tracking if we didn't just resolve a ref (to avoid double counting)
+    // OR send anyway if you want to track page views separately from campaign clicks
+    // For now, we'll send both but the backend handles them differently
+    
     console.log('📊 Sending tracking data:', trackingData);
     
     // Send tracking data to your tracking server

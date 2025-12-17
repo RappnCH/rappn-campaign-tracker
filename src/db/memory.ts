@@ -186,22 +186,44 @@ export const memoryDb = {
       const sheetPlacements = await loadPlacementsFromSheets();
       sheetPlacements.forEach((p: any) => {
         const campaignPlacements = placements.get(p.campaign_id) || [];
-        const exists = campaignPlacements.some(existing => existing.id === p.id);
-        if (!exists) {
+        const existingIndex = campaignPlacements.findIndex(existing => existing.id === p.id);
+        
+        let placementToProcess = p;
+
+        if (existingIndex >= 0) {
+          // Update existing placement with newer data (later rows in Sheets override earlier ones)
+          campaignPlacements[existingIndex] = { ...campaignPlacements[existingIndex], ...p };
+          placementToProcess = campaignPlacements[existingIndex];
+        } else {
           campaignPlacements.push(p);
-          placements.set(p.campaign_id, campaignPlacements);
+        }
+        placements.set(p.campaign_id, campaignPlacements);
           
-          // Re-create redirect code if it exists
-          if (p.tracked_url && p.final_url) {
-            const codeMatch = p.tracked_url.match(/\/r\/([a-z0-9]+)/);
-            if (codeMatch) {
-              redirectCodes.set(codeMatch[1], { placement_id: p.id, final_url: p.final_url });
-            }
+        // Re-create redirect code if it exists
+        if (placementToProcess.tracked_url && placementToProcess.final_url) {
+          // Try to match old format (/r/code) or new format (?ref=code)
+          let code = null;
+          const oldMatch = placementToProcess.tracked_url.match(/\/r\/([a-z0-9]+)/);
+          const newMatch = placementToProcess.tracked_url.match(/[?&]ref=([a-z0-9]+)/);
+          
+          if (newMatch) {
+            code = newMatch[1];
+          } else if (oldMatch) {
+            code = oldMatch[1];
+          }
+
+          if (code) {
+            redirectCodes.set(code, { placement_id: placementToProcess.id, final_url: placementToProcess.final_url });
+            // Ensure the placement object has the code
+            placementToProcess.redirect_code = code;
+            console.log(`   🔗 Loaded redirect code: ${code} -> Placement ${placementToProcess.id}`);
+          } else {
+            console.log(`   ⚠️ No redirect code found in URL: ${placementToProcess.tracked_url}`);
           }
         }
       });
 
-      console.log(`✅ Initialized database with ${campaigns.size} campaigns and ${sheetPlacements.length} placements from Google Sheets`);
+      console.log(`✅ Initialized database with ${campaigns.size} campaigns, ${sheetPlacements.length} placements, and ${redirectCodes.size} redirect codes`);
     } catch (error) {
       console.warn('⚠️  Could not load from Google Sheets, using seed data:', error);
       this.seedData();

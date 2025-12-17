@@ -1358,11 +1358,12 @@ function renderCampaignDetail() {
                                     <label class="text-xs font-semibold text-rappn-green uppercase tracking-wide">📊 Tracked URL (Use this in your ads!)</label>
                                 </div>
                                 <div class="flex gap-2">
-                                    <input type="text" value="${p.tracked_url || p.final_url}" readonly class="flex-1 px-3 py-2 bg-green-50 border-2 border-rappn-green rounded text-sm font-mono font-semibold">
-                                    <button onclick="copyUrl('${p.tracked_url || p.final_url}')" class="px-4 py-2 bg-rappn-green text-white rounded hover:opacity-90">Copy Tracked URL</button>
-                                    <button onclick="openTrackedUrl('${p.tracked_url || p.final_url}')" class="px-4 py-2 bg-blue-500 text-white rounded hover:opacity-90">Test</button>
+                                    <input type="text" value="${p.redirect_code ? `https://rappn.ch/en?ref=${p.redirect_code}` : (p.tracked_url || p.final_url)}" readonly class="flex-1 px-3 py-2 bg-green-50 border-2 border-rappn-green rounded text-sm font-mono font-semibold">
+                                    <button onclick="copyUrl('${p.redirect_code ? `https://rappn.ch/en?ref=${p.redirect_code}` : (p.tracked_url || p.final_url)}')" class="px-4 py-2 bg-rappn-green text-white rounded hover:opacity-90">Copy</button>
+                                    <button onclick="openTrackedUrl('${p.redirect_code ? `https://rappn.ch/en?ref=${p.redirect_code}` : (p.tracked_url || p.final_url)}')" class="px-4 py-2 bg-blue-500 text-white rounded hover:opacity-90">Test</button>
+                                    ${!p.redirect_code ? `<button onclick="generateShortLink(${p.id}, '${p.final_url}')" class="px-4 py-2 bg-purple-600 text-white rounded hover:opacity-90" title="Hide long URL parameters">Shorten</button>` : ''}
                                 </div>
-                                ${p.final_url ? `<div class="text-xs text-gray-500 mt-2">→ Redirects to: <span class="font-mono">${p.final_url}</span></div>` : ''}
+                                ${p.final_url && (p.redirect_code || p.tracked_url) && p.final_url !== (p.redirect_code ? `https://rappn.ch/en?ref=${p.redirect_code}` : p.tracked_url) ? `<div class="text-xs text-gray-500 mt-2">→ Redirects to: <span class="font-mono">${p.final_url}</span></div>` : ''}
                                 <div class="flex items-center gap-4 p-3 bg-purple-50 rounded-lg">
                                     <div class="flex-shrink-0">
                                         <div id="qr-${p.id}" class="bg-white p-3 rounded" style="width: 200px; height: 200px;"></div>
@@ -1412,7 +1413,7 @@ function renderCampaignDetail() {
                         </div>
                         <div>
                             <label class="block text-sm font-medium mb-2">Landing Page URL</label>
-                            <input type="url" id="baseurl" value="https://rappn-landing-page.vercel.app/it" class="w-full px-3 py-2 border rounded">
+                            <input type="url" id="baseurl" value="https://rappn.ch" class="w-full px-3 py-2 border rounded" placeholder="e.g. rappn.ch">
                         </div>
                     </div>
                     <div class="flex gap-3">
@@ -2157,7 +2158,7 @@ function generateQRCodes() {
             container.innerHTML = '';
             try {
                 // Use tracked_url for QR codes to log every scan
-                const qrTarget = p.tracked_url || p.final_url || '';
+                const qrTarget = p.redirect_code ? `https://rappn.ch/en?ref=${p.redirect_code}` : (p.tracked_url || p.final_url || '');
                 console.log('Creating QR code for placement', p.id, 'with tracked URL:', qrTarget);
                 new QRCode(container, {
                     text: qrTarget,
@@ -3098,4 +3099,27 @@ window.downloadQR = function(qrElementId, qrId) {
         });
     };
     logoImg.src = '/logo.svg';
+};
+
+window.generateShortLink = async function(placementId, finalUrl) {
+    try {
+        const response = await fetch(`${API_BASE}/tracking/shorten-existing`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ placement_id: placementId, final_url: finalUrl })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            // Reload placements to show the new link
+            await viewCampaign(selectedCampaign.campaign_id);
+            alert('Short link generated successfully!');
+        } else {
+            const error = await response.json();
+            alert('Failed to generate short link: ' + (error.message || error.error));
+        }
+    } catch (error) {
+        console.error('Error generating short link:', error);
+        alert('Failed to generate short link');
+    }
 };

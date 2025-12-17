@@ -66,4 +66,5 @@ export interface TrackingOutput {
   qr_id: string;
   final_url: string;
   tracked_url: string;
+  redirect_code?: string;
 }
